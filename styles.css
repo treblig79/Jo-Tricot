@@ -345,6 +345,56 @@ main {
 }
 .session-duration { font-weight: 700; }
 
+/* ---- Compteur de mailles ---- */
+.stitch-box {
+  background: #fff7ed;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.stitch-head {
+  margin: 0 0 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.stitch-display {
+  margin: 0 0 12px;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.stitch-controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.stitch-controls .btn { min-width: 96px; }
+.stitch-minus { background: #fff; border: 2px solid #f3cfa4; color: var(--accent); }
+.stitch-manual {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-top: 14px;
+  text-align: left;
+}
+.stitch-manual .field { flex: 1 1 auto; margin-bottom: 0; min-width: 0; }
+.stitch-manual .field input { padding: 11px 12px; }
+.stitch-manual .btn { flex: 0 0 auto; }
+.stitch-hint { color: var(--muted); font-size: 0.8rem; margin: 12px 0 0; }
+
+.stitch-pill {
+  flex: 0 0 auto;
+  background: #fff7ed;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .sr-only {
   position: absolute; width: 1px; height: 1px;
   margin: -1px; padding: 0; overflow: hidden;

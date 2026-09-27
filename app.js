@@ -36,6 +36,10 @@ const btnTimerStop = $('btn-timer-stop');
 const timerHint = $('timer-hint');
 const timerBox = $('timer-box');
 
+const stitchDisplay = $('stitch-display');
+const stitchInput = $('stitch-input');
+const stitchHint = $('stitch-hint');
+
 const formTitle = $('form-title');
 const projectName = $('project-name');
 const projectPattern = $('project-pattern');
@@ -153,6 +157,10 @@ function formatGrams(g) {
   return (Math.round(g || 0) + ' g');
 }
 
+function formatCount(n) {
+  return String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
 function formatYarn(g, m) {
   if (g && m) return Math.round(g) + ' g · ' + Math.round(m) + ' m';
   if (g) return Math.round(g) + ' g';
@@ -211,6 +219,10 @@ function timeOf(projetId) {
   return sessionsOf(projetId).reduce((sum, s) => sum + (s.dureeMin || 0), 0);
 }
 
+function stitchesOf(projetId) {
+  return sessionsOf(projetId).reduce((sum, s) => sum + (s.mailles || 0), 0);
+}
+
 function yarnTotalsOf(projetId) {
   return yarnsOf(projetId).reduce(
     (acc, y) => ({ g: acc.g + (y.grammes || 0), m: acc.m + (y.metres || 0) }),
@@ -225,6 +237,7 @@ function projectOf(id) {
 // ---------- Rendu : Tableau de bord ----------
 function renderDashboard() {
   const totalMin = allSessions.reduce((sum, s) => sum + (s.dureeMin || 0), 0);
+  const totalStitches = allSessions.reduce((sum, s) => sum + (s.mailles || 0), 0);
   const runningCount = allProjects.filter((p) => p.status === 'en_cours').length;
   const { g, m } = allYarns.reduce(
     (acc, y) => ({ g: acc.g + (y.grammes || 0), m: acc.m + (y.metres || 0) }),
@@ -234,17 +247,18 @@ function renderDashboard() {
   $('stat-time').textContent = formatDur(totalMin);
   $('stat-projects').textContent = runningCount;
   $('stat-yarn').textContent = formatYarn(g, m);
+  $('stat-stitches').textContent = formatCount(totalStitches);
 
   // Classement par projet
   const ranked = allProjects
-    .map((p) => ({ p, time: timeOf(p.id), yarn: yarnTotalsOf(p.id) }))
+    .map((p) => ({ p, time: timeOf(p.id), yarn: yarnTotalsOf(p.id), stitches: stitchesOf(p.id) }))
     .sort((a, b) => b.time - a.time);
   const maxTime = ranked.length ? Math.max(...ranked.map((r) => r.time)) : 0;
 
   projectRanking.innerHTML = '';
   dashboardEmpty.classList.toggle('hidden', allProjects.length > 0);
 
-  ranked.forEach(({ p, time, yarn }) => {
+  ranked.forEach(({ p, time, yarn, stitches }) => {
     const li = document.createElement('li');
     li.className = 'doc-item';
     li.addEventListener('click', () => openProject(p.id));
@@ -256,6 +270,8 @@ function renderDashboard() {
       '<div class="doc-stats">' +
         '<span class="mini-stat"><span class="mini-lbl">Temps</span><span class="mini-val">' +
           escapeHtml(formatDur(time)) + '</span></span>' +
+        '<span class="mini-stat"><span class="mini-lbl">Mailles</span><span class="mini-val">' +
+          escapeHtml(formatCount(stitches)) + '</span></span>' +
         '<span class="mini-stat"><span class="mini-lbl">Laine</span><span class="mini-val">' +
           escapeHtml(formatYarn(yarn.g, yarn.m)) + '</span></span>' +
       '</div>';
@@ -411,6 +427,71 @@ function syncTimerTick() {
   }
 }
 
+// ---------- Compteur de mailles ----------
+const STITCH_KEY = 'carnet-tricot:mailles';
+let stitchCounts = {};
+
+function loadStitchCounts() {
+  try {
+    const raw = localStorage.getItem(STITCH_KEY);
+    const obj = raw ? JSON.parse(raw) : null;
+    return obj && typeof obj === 'object' ? obj : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveStitchCounts() {
+  try {
+    localStorage.setItem(STITCH_KEY, JSON.stringify(stitchCounts));
+  } catch (e) {
+    // stockage indisponible : le compteur reste en mémoire
+  }
+}
+
+function stitchCountOf(projetId) {
+  return Math.max(0, Math.round(stitchCounts[projetId] || 0));
+}
+
+function setStitchCount(projetId, value) {
+  const n = Math.max(0, Math.round(value || 0));
+  if (n > 0) {
+    stitchCounts[projetId] = n;
+  } else {
+    delete stitchCounts[projetId];
+  }
+  saveStitchCounts();
+}
+
+function renderStitchUI() {
+  const p = currentProjectId ? projectOf(currentProjectId) : null;
+  if (!p) return;
+  const count = stitchCountOf(p.id);
+  const total = stitchesOf(p.id);
+  stitchDisplay.textContent = formatCount(count);
+  stitchInput.value = count > 0 ? String(count) : '';
+  $('btn-stitch-minus').disabled = count <= 0;
+  stitchHint.textContent = count > 0
+    ? 'Séance en cours : ' + formatCount(count) + ' maille' + (count > 1 ? 's' : '') +
+      ' · total du projet : ' + formatCount(total) + ' mailles'
+    : 'Total du projet : ' + formatCount(total) + ' maille' + (total > 1 ? 's' : '') +
+      '. Appuyez sur « + 1 maille » à chaque maille.';
+}
+
+function bumpStitch(delta) {
+  const p = projectOf(currentProjectId);
+  if (!p) return;
+  setStitchCount(p.id, stitchCountOf(p.id) + delta);
+  renderStitchUI();
+}
+
+function applyStitchInput() {
+  const p = projectOf(currentProjectId);
+  if (!p) return;
+  setStitchCount(p.id, parseInt(stitchInput.value, 10) || 0);
+  renderStitchUI();
+}
+
 // ---------- Rendu : Détail projet ----------
 function renderProjectDetail() {
   const p = projectOf(currentProjectId);
@@ -432,6 +513,7 @@ function renderProjectDetail() {
   renderSessions();
   renderYarns();
   renderTimerUI();
+  renderStitchUI();
 }
 
 function renderSessions() {
@@ -439,11 +521,13 @@ function renderSessions() {
   if (!p) return;
   const sessions = sessionsOf(p.id).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const total = sessions.reduce((sum, s) => sum + (s.dureeMin || 0), 0);
+  const totalStitches = sessions.reduce((sum, s) => sum + (s.mailles || 0), 0);
 
   sessionList.innerHTML = '';
   $('sessions-empty').classList.toggle('hidden', sessions.length > 0);
   sessionsTotal.textContent = sessions.length
-    ? sessions.length + ' session' + (sessions.length > 1 ? 's' : '') + ' · total ' + formatDur(total)
+    ? sessions.length + ' session' + (sessions.length > 1 ? 's' : '') + ' · total ' + formatDur(total) +
+      (totalStitches > 0 ? ' · ' + formatCount(totalStitches) + ' mailles' : '')
     : '';
 
   sessions.forEach((s) => {
@@ -453,6 +537,11 @@ function renderSessions() {
     node.querySelector('.session-date').textContent = formatDateStr(s.date);
     node.querySelector('.session-duration').textContent = formatDur(s.dureeMin);
     node.querySelector('.session-note').textContent = s.note || '';
+    const pill = node.querySelector('.session-stitches');
+    const st = Math.round(s.mailles || 0);
+    pill.textContent = formatCount(st) + ' M';
+    pill.title = st + (st > 1 ? ' mailles' : ' maille');
+    pill.classList.toggle('hidden', st <= 0);
     node.querySelector('.btn-delete-mini').addEventListener('click', async (e) => {
       e.stopPropagation();
       if (confirm('Supprimer cette session ?')) {
@@ -508,6 +597,7 @@ function openProject(id) {
   $('yarn-form-details').removeAttribute('open');
   $('session-date').value = todayInput();
   $('session-duration').value = '';
+  $('session-stitches').value = '';
   $('session-note').value = '';
   $('yarn-name').value = '';
   $('yarn-grams').value = '';
@@ -597,6 +687,7 @@ $('btn-delete-project').addEventListener('click', async () => {
   await delItem(STORES.projets, p.id);
 
   if (timerState && timerState.projetId === p.id) clearTimerState();
+  setStitchCount(p.id, 0);
   allProjects = allProjects.filter((x) => x.id !== p.id);
   allSessions = allSessions.filter((x) => x.projetId !== p.id);
   allYarns = allYarns.filter((x) => x.projetId !== p.id);
@@ -605,6 +696,17 @@ $('btn-delete-project').addEventListener('click', async () => {
   renderDashboard();
   renderTimerUI();
   showView('projects');
+});
+
+// ---------- Événements : compteur de mailles ----------
+$('btn-stitch-plus').addEventListener('click', () => bumpStitch(1));
+$('btn-stitch-minus').addEventListener('click', () => bumpStitch(-1));
+$('btn-stitch-apply').addEventListener('click', applyStitchInput);
+stitchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    applyStitchInput();
+  }
 });
 
 // ---------- Événements : sessions manuelles ----------
@@ -622,6 +724,7 @@ $('btn-add-session').addEventListener('click', async () => {
     projetId: p.id,
     date: $('session-date').value || todayInput(),
     dureeMin: minutes,
+    mailles: Math.max(0, Math.round(parseInt($('session-stitches').value, 10) || 0)),
     note: $('session-note').value.trim() || '',
     createdAt: Date.now(),
   };
@@ -629,6 +732,7 @@ $('btn-add-session').addEventListener('click', async () => {
   allSessions.push(session);
   $('session-date').value = todayInput();
   $('session-duration').value = '';
+  $('session-stitches').value = '';
   $('session-note').value = '';
   renderSessions();
   renderProjects();
@@ -698,13 +802,16 @@ btnTimerStop.addEventListener('click', async () => {
 
   const ms = timerElapsed();
   const minutes = Math.max(1, Math.round(ms / 60000));
+  const stitches = stitchCountOf(p.id);
   clearTimerState();
+  setStitchCount(p.id, 0);
 
   const session = {
     id: uid(),
     projetId: p.id,
     date: todayInput(),
     dureeMin: minutes,
+    mailles: stitches,
     note: '',
     createdAt: Date.now(),
   };
@@ -714,7 +821,9 @@ btnTimerStop.addEventListener('click', async () => {
   renderProjects();
   renderDashboard();
   renderTimerUI();
-  timerHint.textContent = 'Session de ' + formatDur(minutes) + ' enregistrée.';
+  renderStitchUI();
+  timerHint.textContent = 'Session de ' + formatDur(minutes) + ' enregistrée' +
+    (stitches > 0 ? ' · ' + formatCount(stitches) + ' mailles' : '') + '.';
 });
 
 // Mise à jour de l'affichage chaque seconde
@@ -742,5 +851,6 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
   allSessions = await getAll(STORES.sessions);
   allYarns = await getAll(STORES.laines);
   timerState = loadTimerDB();
+  stitchCounts = loadStitchCounts();
   renderDashboard();
 })();

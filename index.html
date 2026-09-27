@@ -38,6 +38,10 @@
           <span class="stat-label">Laine utilisée</span>
           <span id="stat-yarn" class="stat-value">—</span>
         </div>
+        <div class="stat-card">
+          <span class="stat-label">Mailles cumulées</span>
+          <span id="stat-stitches" class="stat-value">—</span>
+        </div>
       </div>
 
       <h2 class="section-title">Par projet</h2>
@@ -98,6 +102,23 @@
             <p class="timer-hint" id="timer-hint"></p>
           </div>
 
+          <div class="stitch-box" id="stitch-box">
+            <p class="stitch-head">Mailles de la séance</p>
+            <p class="stitch-display" id="stitch-display">0</p>
+            <div class="stitch-controls">
+              <button id="btn-stitch-minus" class="btn stitch-minus" aria-label="Retirer une maille">− 1</button>
+              <button id="btn-stitch-plus" class="btn btn-primary">+ 1 maille</button>
+            </div>
+            <div class="stitch-manual">
+              <label class="field">
+                <span>Ajuster à la main</span>
+                <input type="number" id="stitch-input" min="0" step="1" inputmode="numeric" placeholder="Ex : 120">
+              </label>
+              <button id="btn-stitch-apply" class="btn btn-secondary">Ok</button>
+            </div>
+            <p class="stitch-hint" id="stitch-hint"></p>
+          </div>
+
           <details class="details-form" id="manual-session-details">
             <summary>Saisie manuelle</summary>
             <div class="form-row2">
@@ -110,6 +131,10 @@
                 <input type="text" id="session-duration" placeholder="Ex : 1:30" inputmode="numeric">
               </label>
             </div>
+            <label class="field">
+              <span>Mailles (facultatif)</span>
+              <input type="number" id="session-stitches" min="0" step="1" inputmode="numeric" placeholder="0">
+            </label>
             <label class="field">
               <span>Note (facultatif)</span>
               <input type="text" id="session-note" placeholder="Ex : col terminé, 3 rangs de bordure…">
@@ -221,6 +246,7 @@
         <span class="session-duration"></span>
         <span class="doc-detail session-note"></span>
       </div>
+      <span class="stitch-pill session-stitches hidden"></span>
       <button class="btn-delete-mini" title="Supprimer">✕</button>
     </li>
   </template>
