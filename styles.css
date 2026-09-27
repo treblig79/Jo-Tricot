@@ -335,7 +335,10 @@ main {
 /* ---- Sessions ---- */
 .session-date {
   flex: 0 0 auto;
-  width: 46px;
+  width: 90px;
+  min-width: 90px;
+  font-size: 0.85rem;
+  white-space: nowrap;
   text-align: center;
   color: var(--primary);
   font-weight: 700;
