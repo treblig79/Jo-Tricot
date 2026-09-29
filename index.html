@@ -273,15 +273,19 @@
         </div>
         <div class="form-row2">
           <label class="field">
-            <span>Prix pour 100 g ($)</span>
-            <input type="number" id="stf-prix" min="0" step="0.01" inputmode="decimal" placeholder="Calculé d'après les achats">
+            <span>Poids en stock (g)</span>
+            <input type="number" id="stf-poids" min="0" step="1" inputmode="decimal" placeholder="Ex : 450">
           </label>
           <label class="field">
-            <span>Notes (facultatif)</span>
-            <input type="text" id="stf-notes" placeholder="Ex : 4 pelotes restantes…">
+            <span>Prix payé pour ce poids ($)</span>
+            <input type="number" id="stf-prix" min="0" step="0.01" inputmode="decimal" placeholder="Calculé d'après les achats">
           </label>
         </div>
-        <p class="detail-hint" id="stf-prix-hint">Laissez vide pour utiliser le prix moyen calculé à partir de vos achats.</p>
+        <label class="field">
+          <span>Notes (facultatif)</span>
+          <input type="text" id="stf-notes" placeholder="Ex : 4 pelotes restantes…">
+        </label>
+        <p class="detail-hint" id="stf-prix-hint">Laissez le prix vide pour utiliser le prix moyen calculé à partir de vos achats.</p>
         <div class="form-actions">
           <button id="btn-cancel-stock" class="btn btn-ghost hidden">Annuler</button>
           <button id="btn-add-stock" class="btn btn-secondary">Ajouter la laine</button>

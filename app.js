@@ -844,6 +844,11 @@ function renderYarnDetail() {
     bits.push('<strong>Moyen des achats :</strong> ' + formatPrice100(moy) +
       ' — ignoré, un prix est saisi sur la fiche.');
   }
+  if (base > 0 && stockOfficial(s.id) > 0) {
+    // Équivalent du prix saisi, exprimé sur le stock actuel
+    bits.push('<strong>Prix saisi :</strong> ' + formatPrice((base / 100) * stockOfficial(s.id)) +
+      ' pour ' + formatCount(stockOfficial(s.id)) + ' g (' + formatPrice100(base / 100) + ')');
+  }
   if (s.ajustementG) {
     const adj = s.ajustementG;
     bits.push('<strong>Ajustement manuel :</strong> ' + (adj >= 0 ? '+' : '') + formatCount(adj) + ' g' +
@@ -1172,13 +1177,44 @@ function resetStockForm() {
   $('stf-nom-couleur').value = '';
   $('stf-notes').value = '';
   $('stf-couleur').value = '#c81e1e';
+  $('stf-poids').value = '';
   $('stf-prix').value = '';
   $('btn-add-stock').textContent = 'Ajouter la laine';
   $('btn-cancel-stock').classList.add('hidden');
   $('stf-prix-hint').textContent =
-    'Laissez vide pour utiliser le prix moyen calculé à partir de vos achats.';
+    'Laissez le prix vide pour utiliser le prix moyen calculé à partir de vos achats.';
   $('stock-form-details').querySelector('summary').textContent = 'Nouvelle référence de laine';
 }
+
+// Aide sous le formulaire : translation en direct du couple poids / prix payé
+function stockFormHint() {
+  const poidsBrut = $('stf-poids').value.trim();
+  const prixBrut = $('stf-prix').value.trim();
+  const poids = parseFloat(poidsBrut) || 0;
+  const prix = parseFloat(prixBrut) || 0;
+  if (poids > 0 && prix > 0) {
+    return poidsBrut + ' g pour ' + formatPrice(prix) + ' → ' +
+      formatPrice100(((prix / poids) * 100) / 100) +
+      ' — ce prix sera utilisé dans tous les calculs.';
+  }
+  if (poids > 0 && prixBrut === '') {
+    const moy = averagePriceOf(editingStockId);
+    return poidsBrut + ' g · sans prix saisi, le prix moyen de vos achats (' +
+      (moy > 0 ? formatPrice100(moy) : 'non renseigné') + ') sera utilisé.';
+  }
+  if (prixBrut !== '') {
+    return 'Indiquez le poids (g) pour que le prix pour 100 g soit calculé.';
+  }
+  return 'Laissez le prix vide pour utiliser le prix moyen calculé à partir de vos achats.';
+}
+
+function refreshStockFormHint() {
+  $('stf-prix-hint').textContent = stockFormHint();
+}
+
+['stf-poids', 'stf-prix'].forEach((id) => {
+  $(id).addEventListener('input', refreshStockFormHint);
+});
 
 // Remplit le formulaire de référence pour modification (utilisé depuis l'inventaire et le détail)
 function startStockEdit(id) {
@@ -1189,15 +1225,19 @@ function startStockEdit(id) {
   $('stf-couleur').value = s.couleur || '#c81e1e';
   $('stf-nom-couleur').value = s.nomCouleur || '';
   $('stf-notes').value = s.notes || '';
-  $('stf-prix').value = s.prixBase > 0 ? String(s.prixBase) : '';
+  // Poids total réellement disponible (achats - validés + ajustement)
+  const poids = stockOfficial(id);
+  $('stf-poids').value = poids > 0 ? String(Math.round(poids)) : '';
+  // Prix payé pour ce poids = prix par 100 g x poids, déduit du prix de base existant
+  const base = basePriceOf(id);
+  const prix = base > 0 && poids > 0 ? (base / 100) * poids : 0;
+  $('stf-prix').value = prix > 0 ? String(Math.round(prix * 100) / 100) : '';
   $('btn-add-stock').textContent = 'Enregistrer les modifications';
   $('btn-cancel-stock').classList.remove('hidden');
   $('stock-form-details').querySelector('summary').textContent = 'Modifier la référence';
-  $('stf-prix-hint').textContent = s.prixBase > 0
-    ? 'Un prix est saisi sur cette fiche : il remplace le prix moyen des achats.'
-    : 'Laissez vide pour utiliser le prix moyen calculé à partir de vos achats.';
+  refreshStockFormHint();
   $('stock-form-details').setAttribute('open', '');
-  $('stf-prix').focus();
+  $('stf-poids').focus();
 }
 
 $('btn-cancel-stock').addEventListener('click', () => resetStockForm());
@@ -1227,8 +1267,33 @@ $('btn-add-stock').addEventListener('click', async () => {
   ref.couleur = $('stf-couleur').value || '#c81e1e';
   ref.nomCouleur = $('stf-nom-couleur').value.trim();
   ref.notes = $('stf-notes').value.trim();
+
+  const poidsBrut = $('stf-poids').value.trim();
+  const poids = poidsBrut === '' ? null : Math.max(0, parseFloat(poidsBrut) || 0);
   const prixBrut = $('stf-prix').value.trim();
-  ref.prixBase = prixBrut === '' ? 0 : Math.max(0, parseFloat(prixBrut) || 0);
+  const prix = prixBrut === '' ? 0 : Math.max(0, parseFloat(prixBrut) || 0);
+
+  if (prix > 0 && !(poids > 0)) {
+    alert('Indiquez le poids en stock (g) pour que le prix pour 100 g soit calculé.');
+    $('stf-poids').focus();
+    return;
+  }
+  // Le poids saisi devient le stock officiel : on passe par l'ajustement pour
+  // conserver l'historique des achats et ne jamais casser les validations de projets.
+  if (poids !== null) {
+    const engage = stockEngaged(ref.id);
+    if (poids < engage) {
+      alert('Impossible : ' + Math.round(engage) + ' g de cette laine sont engagés dans un projet en cours.\n' +
+        'Libérez d\'abord ces quantités, ou indiquez un poids supérieur ou égal à ' +
+        Math.round(engage) + ' g.');
+      $('stf-poids').focus();
+      return;
+    }
+    ref.ajustementG = poids - purchasedGrams(ref.id) + gramsUsed(ref.id, true);
+    ref.ajustementNote = ref.ajustementG === 0 ? '' : 'Poids saisi sur la fiche';
+  }
+  // Prix payé -> prix de base pour 100 g
+  ref.prixBase = prix > 0 && poids > 0 ? (prix / poids) * 100 : 0;
 
   await putItem(STORES.lainesStock, ref);
   allStock = allStock.filter((x) => x.id !== ref.id);
