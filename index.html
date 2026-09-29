@@ -186,7 +186,7 @@
                 <input type="number" id="yarn-grams" min="0" step="1" inputmode="decimal" placeholder="0">
               </label>
               <label class="field">
-                <span>4 · Prix (€, facultatif)</span>
+                <span>4 · Prix ($, facultatif)</span>
                 <input type="number" id="yarn-prix" min="0" step="0.01" inputmode="decimal" placeholder="Automatique">
               </label>
             </div>
@@ -215,7 +215,7 @@
           <span class="cost-val" id="cost-other">—</span>
         </div>
         <label class="field cost-field">
-          <span>Saisir les autres frais (€)</span>
+          <span>Saisir les autres frais ($)</span>
           <input type="number" id="project-other-cost" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
         </label>
         <div class="cost-line total">
@@ -271,11 +271,21 @@
             <input type="text" id="stf-nom-couleur" placeholder="Ex : rouge carmin">
           </label>
         </div>
-        <label class="field">
-          <span>Notes (facultatif)</span>
-          <input type="text" id="stf-notes" placeholder="Ex : 4 pelotes restantes…">
-        </label>
-        <button id="btn-add-stock" class="btn btn-secondary">Ajouter la laine</button>
+        <div class="form-row2">
+          <label class="field">
+            <span>Prix pour 100 g ($)</span>
+            <input type="number" id="stf-prix" min="0" step="0.01" inputmode="decimal" placeholder="Calculé d'après les achats">
+          </label>
+          <label class="field">
+            <span>Notes (facultatif)</span>
+            <input type="text" id="stf-notes" placeholder="Ex : 4 pelotes restantes…">
+          </label>
+        </div>
+        <p class="detail-hint" id="stf-prix-hint">Laissez vide pour utiliser le prix moyen calculé à partir de vos achats.</p>
+        <div class="form-actions">
+          <button id="btn-cancel-stock" class="btn btn-ghost hidden">Annuler</button>
+          <button id="btn-add-stock" class="btn btn-secondary">Ajouter la laine</button>
+        </div>
       </details>
 
       <h2 class="section-title">Mes laines</h2>
@@ -332,7 +342,7 @@
                 <input type="number" id="pur-grammes" min="0" step="1" inputmode="decimal" placeholder="0">
               </label>
               <label class="field">
-                <span>Prix payé (€)</span>
+                <span>Prix payé ($)</span>
                 <input type="number" id="pur-prix" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
               </label>
             </div>
@@ -345,6 +355,7 @@
               <input type="text" id="pur-note" placeholder="Ex : solde, lot de 3 écheveaux">
             </label>
             <button id="btn-add-purchase" class="btn btn-secondary">Ajouter cet achat</button>
+            <button id="btn-cancel-purchase" class="btn btn-ghost hidden">Annuler la modification</button>
           </details>
 
           <p id="purchases-total" class="list-total"></p>
@@ -462,6 +473,8 @@
         <span class="mini-stat"><span class="mini-lbl">Prix</span><span class="mini-val stock-price"></span></span>
       </div>
       <span class="inactive-pill hidden">Inactive</span>
+      <button class="btn-edit-mini" title="Modifier la laine et son prix">✎</button>
+      <button class="btn-delete-mini" title="Supprimer">✕</button>
     </li>
   </template>
 
@@ -476,10 +489,10 @@
         <span class="mini-stat"><span class="mini-lbl">Prix</span><span class="mini-val purchase-price"></span></span>
         <span class="mini-stat"><span class="mini-lbl">Le gramme</span><span class="mini-val purchase-unit"></span></span>
       </div>
+      <button class="btn-edit-mini" title="Modifier cet achat">✎</button>
       <button class="btn-delete-mini" title="Supprimer">✕</button>
     </li>
   </template>
-
   <!-- ===== Modale : achat de laine ===== -->
   <div id="purchase-modal" class="modal hidden">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="purchase-modal-title">
@@ -502,7 +515,7 @@
           <input type="number" id="pm-grams" min="0" step="1" inputmode="decimal" placeholder="0">
         </label>
         <label class="field">
-          <span>4 · Prix payé (€)</span>
+          <span>4 · Prix payé ($)</span>
           <input type="number" id="pm-prix" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
         </label>
       </div>

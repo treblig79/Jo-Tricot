@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 /* ============================================================
    Carnet de Tricot — PWA pour iPad
@@ -70,6 +70,7 @@ let currentProjectId = null;
 let currentStockId = null;
 let editingProjectId = null;
 let editingStockId = null;
+let editingPurchaseId = null;
 
 // ---------- IndexedDB ----------
 const DB_NAME = 'carnet-tricot';
@@ -209,13 +210,13 @@ function formatCount(n) {
   return String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 
-function formatEUR(n) {
+function formatPrice(n) {
   const v = Number(n || 0);
-  return v.toFixed(2).replace('.', ',') + ' €';
+  return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function formatEUR100(parGramme) {
-  return formatEUR((Number(parGramme) || 0) * 100) + ' / 100 g';
+function formatPrice100(parGramme) {
+  return formatPrice((Number(parGramme) || 0) * 100) + ' / 100 g';
 }
 
 function formatYarn(g, m) {
@@ -557,6 +558,11 @@ function stockOf(id) {
   return allStock.find((s) => s.id === id) || null;
 }
 
+// Petit défilement doux (absent de jsdom, d'où la garde)
+function scrollToEl(el) {
+  if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest' });
+}
+
 function achatsOf(laineId) {
   return allAchats.filter((a) => a.laineId === laineId);
 }
@@ -579,11 +585,25 @@ function adjustmentOf(laineId) {
   return s ? (s.ajustementG || 0) : 0;
 }
 
-// Prix de revient moyen au gramme : total dépensé / total acheté
+// Prix de base saisi sur la fiche (pour 100 g) : s'il existe, il est prioritaire
+function basePriceOf(laineId) {
+  const s = stockOf(laineId);
+  return s && s.prixBase > 0 ? s.prixBase : 0;
+}
+
+// Prix de revient au gramme : prix de base saisi, sinon total dépensé / total acheté
 function unitPriceOf(laineId) {
+  const base = basePriceOf(laineId);
+  if (base > 0) return base / 100;
   const g = purchasedGrams(laineId);
   if (g <= 0) return 0;
   return spentTotal(laineId) / g;
+}
+
+// Prix moyen issu des seuls achats (affiché à titre indicatif)
+function averagePriceOf(laineId) {
+  const g = purchasedGrams(laineId);
+  return g > 0 ? spentTotal(laineId) / g : 0;
 }
 
 function gramsUsed(laineId, onlyValidated) {
@@ -652,10 +672,10 @@ function renderCost() {
   const total = yarn + other;
   const hours = timeOf(p.id) / 60;
 
-  $('cost-yarn').textContent = formatEUR(yarn);
-  $('cost-other').textContent = formatEUR(other);
-  $('cost-total').textContent = formatEUR(total);
-  $('cost-per-hour').textContent = hours > 0 ? formatEUR(total / hours) + ' / h' : '—';
+  $('cost-yarn').textContent = formatPrice(yarn);
+  $('cost-other').textContent = formatPrice(other);
+  $('cost-total').textContent = formatPrice(total);
+  $('cost-per-hour').textContent = hours > 0 ? formatPrice(total / hours) + ' / h' : '—';
   $('project-other-cost').value = other > 0 ? String(other) : '';
   $('btn-validate-usages').classList.toggle('hidden', !hasProvisional(p.id));
   $('cost-note').textContent = hasProvisional(p.id)
@@ -723,8 +743,8 @@ function renderStockBox() {
 function renderStock() {
   const sorted = allStock.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
-  $('stock-value').textContent = formatEUR(totalStockValue());
-  $('stock-spent').textContent = formatEUR(totalSpent());
+  $('stock-value').textContent = formatPrice(totalStockValue());
+  $('stock-spent').textContent = formatPrice(totalSpent());
   $('stock-mass').textContent = allStock.length
     ? formatCount(allStock.reduce((sum, s) => sum + Math.max(0, stockForecast(s.id)), 0)) + ' g'
     : '—';
@@ -744,8 +764,17 @@ function renderStock() {
     node.querySelector('.stock-official').textContent = formatCount(stockOfficial(s.id)) + ' g';
     node.querySelector('.stock-engaged').textContent = stockEngaged(s.id) > 0 ? formatCount(stockEngaged(s.id)) + ' g' : '—';
     node.querySelector('.stock-forecast').textContent = formatCount(stockForecast(s.id)) + ' g';
-    node.querySelector('.stock-price').textContent = purchasedGrams(s.id) > 0 ? formatEUR100(unitPriceOf(s.id)) : '—';
+    node.querySelector('.stock-price').textContent =
+      basePriceOf(s.id) > 0 || purchasedGrams(s.id) > 0 ? formatPrice100(unitPriceOf(s.id)) : '—';
+    node.querySelector('.stock-price').title = basePriceOf(s.id) > 0
+      ? 'Prix saisi sur la fiche (modifiable avec ✎)'
+      : 'Prix moyen de vos achats (modifiable avec ✎)';
     node.querySelector('.inactive-pill').classList.toggle('hidden', !inactif);
+    node.querySelector('.btn-edit-mini').addEventListener('click', (e) => {
+      e.stopPropagation();
+      startStockEdit(s.id);
+      scrollToEl($('stock-form-details'));
+    });
     li.addEventListener('click', () => openStock(s.id));
     stockList.appendChild(node);
   });
@@ -753,17 +782,39 @@ function renderStock() {
 
 function openStock(id) {
   currentStockId = id;
-  $('purchase-form-details').removeAttribute('open');
+  resetPurchaseForm();
   $('pur-date').value = todayInput();
-  $('pur-grammes').value = '';
-  $('pur-prix').value = '';
-  $('pur-metres').value = '';
-  $('pur-note').value = '';
   $('adjust-form-details').removeAttribute('open');
   const s = stockOf(id);
   $('adj-grammes').value = s ? String(Math.max(0, Math.round(stockOfficial(id)))) : '';
   $('adj-note').value = '';
   showView('yarn');
+}
+
+function resetPurchaseForm() {
+  editingPurchaseId = null;
+  $('purchase-form-details').removeAttribute('open');
+  $('pur-grammes').value = '';
+  $('pur-prix').value = '';
+  $('pur-metres').value = '';
+  $('pur-note').value = '';
+  $('btn-add-purchase').textContent = 'Ajouter cet achat';
+  $('btn-cancel-purchase').classList.add('hidden');
+}
+
+function startPurchaseEdit(achat) {
+  editingPurchaseId = achat.id;
+  $('purchase-form-details').setAttribute('open', '');
+  $('pur-date').value = achat.date || todayInput();
+  $('pur-grammes').value = achat.grammes ? String(achat.grammes) : '';
+  $('pur-prix').value = achat.prixTotal ? String(achat.prixTotal) : '';
+  $('pur-metres').value = achat.metres ? String(achat.metres) : '';
+  $('pur-note').value = achat.note || '';
+  $('btn-add-purchase').textContent = 'Enregistrer les modifications';
+  $('btn-cancel-purchase').classList.remove('hidden');
+  $('pur-prix').focus();
+  $('pur-prix').select();
+  scrollToEl($('purchase-form-details'));
 }
 
 function renderYarnDetail() {
@@ -784,8 +835,15 @@ function renderYarnDetail() {
   bits.push('<strong>Stock officiel :</strong> ' + formatCount(stockOfficial(s.id)) + ' g');
   bits.push('<strong>Engagé (projets en cours) :</strong> ' + formatCount(stockEngaged(s.id)) + ' g');
   bits.push('<strong>Prévisionnel :</strong> ' + formatCount(stockForecast(s.id)) + ' g');
-  bits.push('<strong>Prix moyen :</strong> ' +
-    (purchasedGrams(s.id) > 0 ? formatEUR100(unitPriceOf(s.id)) : 'non renseigné'));
+  const base = basePriceOf(s.id);
+  const moy = averagePriceOf(s.id);
+  // base est déjà un prix pour 100 g, unitPriceOf est un prix au gramme
+  bits.push('<strong>' + (base > 0 ? 'Prix utilisé :' : 'Prix moyen :') + '</strong> ' +
+    (base > 0 ? formatPrice100(base / 100) : moy > 0 ? formatPrice100(moy) : 'non renseigné'));
+  if (base > 0 && moy > 0) {
+    bits.push('<strong>Moyen des achats :</strong> ' + formatPrice100(moy) +
+      ' — ignoré, un prix est saisi sur la fiche.');
+  }
   if (s.ajustementG) {
     const adj = s.ajustementG;
     bits.push('<strong>Ajustement manuel :</strong> ' + (adj >= 0 ? '+' : '') + formatCount(adj) + ' g' +
@@ -801,7 +859,7 @@ function renderYarnDetail() {
   $('purchases-empty').classList.toggle('hidden', buys.length > 0);
   $('purchases-total').textContent = buys.length
     ? buys.length + ' achat' + (buys.length > 1 ? 's' : '') + ' · ' + formatCount(purchasedGrams(s.id)) +
-      ' g · ' + formatEUR(spentTotal(s.id))
+      ' g · ' + formatPrice(spentTotal(s.id))
     : '';
 
   buys.forEach((a) => {
@@ -810,17 +868,23 @@ function renderYarnDetail() {
     node.querySelector('.purchase-qty').textContent = formatCount(a.grammes || 0) + ' g' +
       (a.metres ? ' · ' + formatCount(a.metres) + ' m' : '');
     node.querySelector('.purchase-note').textContent = a.note || '';
-    node.querySelector('.purchase-price').textContent = formatEUR(a.prixTotal);
+    node.querySelector('.purchase-price').textContent = formatPrice(a.prixTotal);
     node.querySelector('.purchase-unit').textContent = a.grammes
-      ? formatEUR100((a.prixTotal || 0) / a.grammes)
+      ? formatPrice100((a.prixTotal || 0) / a.grammes)
       : '—';
+    node.querySelector('.btn-edit-mini').addEventListener('click', (e) => {
+      e.stopPropagation();
+      startPurchaseEdit(a);
+    });
     node.querySelector('.btn-delete-mini').addEventListener('click', async (e) => {
       e.stopPropagation();
       if (!confirm('Supprimer cet achat ?')) return;
       await delItem(STORES.achats, a.id);
       allAchats = allAchats.filter((x) => x.id !== a.id);
+      if (editingPurchaseId === a.id) resetPurchaseForm();
       renderYarnDetail();
       renderStock();
+      renderDashboard();
     });
     purchaseList.appendChild(node);
   });
@@ -833,7 +897,7 @@ function renderYarnDetail() {
   $('yarn-usage-empty').classList.toggle('hidden', used.length > 0);
   $('yarn-usage-total').textContent = used.length
     ? formatCount(gramsUsed(s.id, true)) + ' g validés · ' + formatCount(stockEngaged(s.id)) +
-      ' g engagés · ' + formatEUR(used.reduce((sum, u) => sum + yarnCostOf(u), 0))
+      ' g engagés · ' + formatPrice(used.reduce((sum, u) => sum + yarnCostOf(u), 0))
     : '';
 
   used.forEach((u) => {
@@ -850,7 +914,7 @@ function renderYarnDetail() {
       (u.valide ? '' : ' (en cours)');
     meta.querySelector('.doc-detail').textContent = formatDateStr(u.date) + ' · ' +
       formatCount(u.grammes || 0) + ' g' + (u.metres ? ' · ' + formatCount(u.metres) + ' m' : '') +
-      ' · ' + formatEUR(yarnCostOf(u));
+      ' · ' + formatPrice(yarnCostOf(u));
     const pill = document.createElement('span');
     pill.className = 'valid-pill ' + (u.valide ? 'valide' : 'provisoire');
     pill.textContent = u.valide ? 'Validée' : 'Engagée';
@@ -939,7 +1003,7 @@ function renderYarns() {
   yarnTotal.textContent = yarns.length
     ? yarns.length + ' référence' + (yarns.length > 1 ? 's' : '') + ' · total ' + formatYarn(total.g, total.m) +
       (engage.length ? ' · ' + formatCount(engage.reduce((s, y) => s + (y.grammes || 0), 0)) + ' g engagés' : '') +
-      (yarnCostOfProject(p.id) > 0 ? ' · ' + formatEUR(yarnCostOfProject(p.id)) : '')
+      (yarnCostOfProject(p.id) > 0 ? ' · ' + formatPrice(yarnCostOfProject(p.id)) : '')
     : '';
 
   yarns.forEach((y) => {
@@ -952,7 +1016,7 @@ function renderYarns() {
       ? (ref.nomCouleur || ref.nom) + (y.note ? ' — ' + y.note : '')
       : (y.note || 'Hors inventaire');
     node.querySelector('.yarn-grams').textContent = formatCount(y.grammes || 0) + ' g';
-    node.querySelector('.yarn-cost').textContent = formatEUR(yarnCostOf(y));
+    node.querySelector('.yarn-cost').textContent = formatPrice(yarnCostOf(y));
     const pill = node.querySelector('.valid-pill');
     pill.textContent = y.valide ? 'Validée' : 'Engagée';
     pill.classList.add(y.valide ? 'valide' : 'provisoire');
@@ -1108,9 +1172,35 @@ function resetStockForm() {
   $('stf-nom-couleur').value = '';
   $('stf-notes').value = '';
   $('stf-couleur').value = '#c81e1e';
+  $('stf-prix').value = '';
   $('btn-add-stock').textContent = 'Ajouter la laine';
+  $('btn-cancel-stock').classList.add('hidden');
+  $('stf-prix-hint').textContent =
+    'Laissez vide pour utiliser le prix moyen calculé à partir de vos achats.';
   $('stock-form-details').querySelector('summary').textContent = 'Nouvelle référence de laine';
 }
+
+// Remplit le formulaire de référence pour modification (utilisé depuis l'inventaire et le détail)
+function startStockEdit(id) {
+  const s = stockOf(id);
+  if (!s) return;
+  editingStockId = id;
+  $('stf-nom').value = s.nom || '';
+  $('stf-couleur').value = s.couleur || '#c81e1e';
+  $('stf-nom-couleur').value = s.nomCouleur || '';
+  $('stf-notes').value = s.notes || '';
+  $('stf-prix').value = s.prixBase > 0 ? String(s.prixBase) : '';
+  $('btn-add-stock').textContent = 'Enregistrer les modifications';
+  $('btn-cancel-stock').classList.remove('hidden');
+  $('stock-form-details').querySelector('summary').textContent = 'Modifier la référence';
+  $('stf-prix-hint').textContent = s.prixBase > 0
+    ? 'Un prix est saisi sur cette fiche : il remplace le prix moyen des achats.'
+    : 'Laissez vide pour utiliser le prix moyen calculé à partir de vos achats.';
+  $('stock-form-details').setAttribute('open', '');
+  $('stf-prix').focus();
+}
+
+$('btn-cancel-stock').addEventListener('click', () => resetStockForm());
 
 $('btn-open-stock').addEventListener('click', () => {
   resetStockForm();
@@ -1137,32 +1227,30 @@ $('btn-add-stock').addEventListener('click', async () => {
   ref.couleur = $('stf-couleur').value || '#c81e1e';
   ref.nomCouleur = $('stf-nom-couleur').value.trim();
   ref.notes = $('stf-notes').value.trim();
+  const prixBrut = $('stf-prix').value.trim();
+  ref.prixBase = prixBrut === '' ? 0 : Math.max(0, parseFloat(prixBrut) || 0);
 
   await putItem(STORES.lainesStock, ref);
   allStock = allStock.filter((x) => x.id !== ref.id);
   allStock.push(ref);
   currentStockId = ref.id;
+  const enEdition = !!editingStockId;
   resetStockForm();
   renderStock();
   renderYarnReferenceSelect();
   renderDashboard();
+  if (enEdition && currentStockId) {
+    renderYarnDetail();
+    renderCost();
+  }
 });
 
 $('btn-yarn-back').addEventListener('click', () => showView('laine'));
 
 $('btn-edit-yarn').addEventListener('click', () => {
-  const s = stockOf(currentStockId);
-  if (!s) return;
-  editingStockId = s.id;
-  $('stf-nom').value = s.nom || '';
-  $('stf-couleur').value = s.couleur || '#c81e1e';
-  $('stf-nom-couleur').value = s.nomCouleur || '';
-  $('stf-notes').value = s.notes || '';
-  $('btn-add-stock').textContent = 'Enregistrer les modifications';
-  $('stock-form-details').querySelector('summary').textContent = 'Modifier la référence';
-  $('stock-form-details').setAttribute('open', '');
+  if (!stockOf(currentStockId)) return;
   showView('laine');
-  $('stf-nom').focus();
+  startStockEdit(currentStockId);
 });
 
 $('btn-toggle-yarn').addEventListener('click', async () => {
@@ -1200,34 +1288,54 @@ $('btn-delete-yarn').addEventListener('click', async () => {
 $('btn-add-purchase').addEventListener('click', async () => {
   const s = stockOf(currentStockId);
   if (!s) return;
-  const grammes = parseFloat($('pur-grammes').value) || 0;
-  const prix = parseFloat($('pur-prix').value) || 0;
+  const grammes = Math.max(0, parseFloat($('pur-grammes').value) || 0);
+  const prix = Math.max(0, parseFloat($('pur-prix').value) || 0);
   if (grammes <= 0 && prix <= 0) {
     $('purchase-form-details').setAttribute('open', '');
     $('pur-grammes').focus();
     return;
   }
-  const achat = {
-    id: uid(),
-    laineId: s.id,
-    date: $('pur-date').value || todayInput(),
-    grammes: Math.max(0, grammes),
-    metres: Math.max(0, parseFloat($('pur-metres').value) || 0),
-    prixTotal: Math.max(0, prix),
-    note: $('pur-note').value.trim() || '',
-    createdAt: Date.now(),
-  };
-  await putItem(STORES.achats, achat);
-  allAchats.push(achat);
-  $('pur-grammes').value = '';
-  $('pur-prix').value = '';
-  $('pur-metres').value = '';
-  $('pur-note').value = '';
+
+  const enEdition = !!editingPurchaseId;
+  let achat = enEdition ? achatsOf(s.id).find((a) => a.id === editingPurchaseId) : null;
+
+  if (enEdition && !achat) {
+    // la ligne a été supprimée entre-temps
+    resetPurchaseForm();
+  } else if (achat) {
+    achat.date = $('pur-date').value || todayInput();
+    achat.grammes = grammes;
+    achat.metres = Math.max(0, parseFloat($('pur-metres').value) || 0);
+    achat.prixTotal = prix;
+    achat.note = $('pur-note').value.trim() || '';
+    await putItem(STORES.achats, achat);
+  } else {
+    achat = {
+      id: uid(),
+      laineId: s.id,
+      date: $('pur-date').value || todayInput(),
+      grammes: grammes,
+      metres: Math.max(0, parseFloat($('pur-metres').value) || 0),
+      prixTotal: prix,
+      note: $('pur-note').value.trim() || '',
+      createdAt: Date.now(),
+    };
+    await putItem(STORES.achats, achat);
+    allAchats.push(achat);
+  }
+
+  resetPurchaseForm();
+  $('pur-date').value = todayInput();
   renderYarnDetail();
   renderStock();
   renderYarns();
   renderCost();
   renderDashboard();
+});
+
+$('btn-cancel-purchase').addEventListener('click', () => {
+  resetPurchaseForm();
+  $('pur-date').value = todayInput();
 });
 
 $('btn-apply-adjust').addEventListener('click', async () => {
@@ -1320,7 +1428,7 @@ function updateYarnFormHint() {
   const engage = stockEngaged(s.id);
   let txt = 'Disponible : ' + formatCount(prevu) + ' g';
   if (engage > 0) txt += ' (dont ' + formatCount(engage) + ' g déjà engagées)';
-  if (purchasedGrams(s.id) > 0) txt += ' · prix moyen ' + formatEUR100(unitPriceOf(s.id));
+  if (purchasedGrams(s.id) > 0) txt += ' · prix moyen ' + formatPrice100(unitPriceOf(s.id));
   if (grammes > prevu) txt += ' ⚠ Engagement supérieur au disponible.';
   $('yarn-form-hint').textContent = txt;
 }
@@ -1377,7 +1485,7 @@ $('pm-ref').addEventListener('change', () => {
   if (s) {
     $('pm-desc').value = s.nom + (s.nomCouleur ? ', ' + s.nomCouleur : '');
     $('pm-info').textContent = 'Disponible : ' + formatCount(stockForecast(s.id)) + ' g' +
-      (purchasedGrams(s.id) > 0 ? ' · prix moyen ' + formatEUR100(unitPriceOf(s.id)) : '');
+      (purchasedGrams(s.id) > 0 ? ' · prix moyen ' + formatPrice100(unitPriceOf(s.id)) : '');
   } else {
     $('pm-desc').value = '';
     $('pm-info').textContent = isNew
