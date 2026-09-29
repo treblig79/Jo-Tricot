@@ -36,6 +36,26 @@ html, body {
 }
 .app-header h1 { margin: 0; font-size: 1.6rem; }
 .app-header .subtitle { margin: 4px 0 0; opacity: 0.85; font-size: 0.95rem; }
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 0;
+  margin: 0;
+  border: none;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.home-btn:hover { text-decoration: underline; }
+.home-btn:active { opacity: 0.75; }
+.home-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 main {
   max-width: 920px;
@@ -166,6 +186,15 @@ main {
   font-size: 1.05rem;
 }
 .doc-detail { color: var(--muted); font-size: 0.85rem; margin-top: 3px; }
+.rank-bar {
+  display: block;
+  height: 6px;
+  margin-top: 7px;
+  background: #ede9fe;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.rank-fill { display: block; height: 100%; background: var(--primary); border-radius: 3px; }
 
 .doc-stats {
   display: flex;
@@ -210,6 +239,28 @@ main {
 .stat-label { display: block; color: var(--muted); font-size: 0.85rem; font-weight: 600; }
 .stat-value { display: block; margin-top: 8px; font-size: 1.6rem; font-weight: 800; color: var(--primary); }
 .stat-sub { display: block; margin-top: 2px; color: var(--muted); font-size: 0.8rem; }
+.stat-card-btn {
+  display: block;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.stat-card-btn:active { transform: scale(0.98); }
+.stat-card-btn:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12); }
+.stat-card-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stat-cue {
+  display: block;
+  margin-top: 3px;
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.7;
+}
+.stat-card-btn:hover .stat-cue { opacity: 1; text-decoration: underline; }
 
 /* ---- Détail projet ---- */
 .project-header {

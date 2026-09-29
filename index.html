@@ -12,7 +12,7 @@
 </head>
 <body>
   <header class="app-header">
-    <h1>Carnet de Tricot</h1>
+    <h1><button type="button" id="btn-home" class="home-btn" title="Revenir à l'accueil">Carnet de Tricot</button></h1>
     <p class="subtitle">Temps et laine de chaque projet</p>
   </header>
 
@@ -50,26 +50,40 @@
       </div>
 
       <div class="stats-grid">
-        <div class="stat-card">
-          <span class="stat-label">Temps total de tricot</span>
+        <button type="button" class="stat-card stat-card-btn" data-stat="time">
+          <span class="stat-label">Temps total de tricot<span class="stat-cue">Voir le détail</span></span>
           <span id="stat-time" class="stat-value">—</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Projets en cours</span>
+        </button>
+        <button type="button" class="stat-card stat-card-btn" data-stat="projects">
+          <span class="stat-label">Projets en cours<span class="stat-cue">Voir le détail</span></span>
           <span id="stat-projects" class="stat-value">—</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Laine utilisée</span>
+        </button>
+        <button type="button" class="stat-card stat-card-btn" data-stat="yarn">
+          <span class="stat-label">Laine utilisée<span class="stat-cue">Voir le détail</span></span>
           <span id="stat-yarn" class="stat-value">—</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Rangs cumulés</span>
+        </button>
+        <button type="button" class="stat-card stat-card-btn" data-stat="stitches">
+          <span class="stat-label">Rangs cumulés<span class="stat-cue">Voir le détail</span></span>
           <span id="stat-stitches" class="stat-value">—</span>
-        </div>
+        </button>
       </div>
 
       <h2 class="section-title">Dernières sessions</h2>
       <ul id="recent-sessions" class="doc-list"></ul>
+    </section>
+
+    <!-- ===== Vue : Détail d'un indicateur du tableau de bord ===== -->
+    <section id="view-stat" class="view">
+      <div class="toolbar">
+        <button id="btn-stat-back" class="btn btn-ghost">← Accueil</button>
+      </div>
+      <section class="panel">
+        <h3 class="panel-title" id="stat-detail-title">Détail</h3>
+        <p class="detail-hint" id="stat-detail-hint"></p>
+        <p class="list-total" id="stat-detail-total"></p>
+        <ul id="stat-detail-list" class="doc-list"></ul>
+        <p id="stat-detail-empty" class="empty-state hidden">Aucune donnée à afficher.</p>
+      </section>
     </section>
 
     <!-- ===== Vue : Liste des projets ===== -->

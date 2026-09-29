@@ -16,6 +16,7 @@ const views = {
   laine: $('view-laine'),
   yarn: $('view-yarn'),
   instructions: $('view-instructions'),
+  stat: $('view-stat'),
 };
 
 const projectList = $('project-list');
@@ -246,6 +247,8 @@ const STATUS_LABELS = {
 };
 
 // ---------- Navigation ----------
+$('btn-home').addEventListener('click', () => showView('dashboard'));
+
 function showView(name) {
   Object.keys(views).forEach((k) => views[k].classList.remove('active'));
   views[name].classList.add('active');
@@ -256,6 +259,7 @@ function showView(name) {
   if (name === 'laine') renderStock();
   if (name === 'yarn') renderYarnDetail();
   if (name === 'instructions') renderInstructions();
+  if (name === 'stat') renderStatDetail();
 }
 
 function showMessage(msg, type) {
@@ -394,6 +398,162 @@ function renderProjects() {
     li.addEventListener('click', () => openProject(p.id));
     projectList.appendChild(node);
   });
+}
+
+// ---------- Détail d'un indicateur du tableau de bord ----------
+let currentStat = 'time';
+
+function openStat(kind) {
+  currentStat = kind;
+  showView('stat');
+}
+
+$('btn-stat-back').addEventListener('click', () => showView('dashboard'));
+document.querySelectorAll('.stat-card-btn').forEach((btn) => {
+  btn.addEventListener('click', () => openStat(btn.dataset.stat));
+});
+
+function statRow(name, sub, valueLabel, value, share, onClick) {
+  const li = document.createElement('li');
+  li.className = 'doc-item';
+
+  const meta = document.createElement('div');
+  meta.className = 'doc-meta';
+  const n = document.createElement('span');
+  n.className = 'doc-name';
+  n.textContent = name;
+  meta.appendChild(n);
+  if (sub) {
+    const d = document.createElement('span');
+    d.className = 'doc-detail';
+    d.textContent = sub;
+    meta.appendChild(d);
+  }
+  if (share > 0) {
+    const bar = document.createElement('span');
+    bar.className = 'rank-bar';
+    const fill = document.createElement('span');
+    fill.className = 'rank-fill';
+    fill.style.width = share + '%';
+    bar.appendChild(fill);
+    meta.appendChild(bar);
+  }
+
+  const stats = document.createElement('div');
+  stats.className = 'doc-stats';
+  const stat = document.createElement('span');
+  stat.className = 'mini-stat';
+  const lbl = document.createElement('span');
+  lbl.className = 'mini-lbl';
+  lbl.textContent = valueLabel;
+  const val = document.createElement('span');
+  val.className = 'mini-val';
+  val.textContent = value;
+  stat.appendChild(lbl);
+  stat.appendChild(val);
+  stats.appendChild(stat);
+
+  li.appendChild(meta);
+  li.appendChild(stats);
+  if (onClick) li.addEventListener('click', onClick);
+  return li;
+}
+
+function renderStatDetail() {
+  const list = $('stat-detail-list');
+  list.innerHTML = '';
+  let title = '';
+  let hint = '';
+  let total = '';
+  const rows = [];
+  const empty = 'Rien à afficher pour le moment.';
+
+  if (currentStat === 'time') {
+    const totalMin = allSessions.reduce((s, x) => s + (x.dureeMin || 0), 0);
+    const per = allProjects
+      .map((p) => ({ p, min: timeOf(p.id) }))
+      .filter((r) => r.min > 0)
+      .sort((a, b) => b.min - a.min);
+    title = 'Temps total de tricot';
+    hint = 'Répartition du temps par projet. Touchez une ligne pour ouvrir le projet.';
+    total = formatDur(totalMin) + ' au total · ' + allSessions.length +
+      ' session' + (allSessions.length > 1 ? 's' : '');
+    per.forEach(({ p, min }) => rows.push(statRow(
+      p.nom,
+      STATUS_LABELS[p.status] || p.status,
+      'Temps',
+      formatDur(min),
+      totalMin ? (min / totalMin) * 100 : 0,
+      () => openProject(p.id)
+    )));
+  } else if (currentStat === 'projects') {
+    const list2 = allProjects
+      .filter((p) => p.status === 'en_cours')
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    title = 'Projets en cours';
+    hint = 'Les projets au statut « En cours ». Touchez une ligne pour ouvrir le projet.';
+    total = list2.length + ' projet' + (list2.length > 1 ? 's' : '') +
+      (allProjects.length ? ' sur ' + allProjects.length + ' au total' : '');
+    list2.forEach((p) => rows.push(statRow(
+      p.nom,
+      p.patron || (p.dateDebut ? 'Débuté le ' + formatDateStr(p.dateDebut) : ''),
+      'Temps',
+      timeOf(p.id) > 0 ? formatDur(timeOf(p.id)) : '—',
+      0,
+      () => openProject(p.id)
+    )));
+  } else if (currentStat === 'yarn') {
+    const byRef = new Map();
+    allYarns.forEach((y) => {
+      const cur = byRef.get(y.laineId) || { g: 0, m: 0, n: 0 };
+      cur.g += y.grammes || 0;
+      cur.m += y.metres || 0;
+      cur.n += 1;
+      byRef.set(y.laineId, cur);
+    });
+    const entries = [...byRef.entries()]
+      .map(([id, v]) => ({ ref: stockOf(id), v }))
+      .filter((e) => e.ref && e.v.g > 0)
+      .sort((a, b) => b.v.g - a.v.g);
+    const tg = entries.reduce((s, e) => s + e.v.g, 0);
+    const tm = entries.reduce((s, e) => s + e.v.m, 0);
+    title = 'Laine utilisée';
+    hint = 'Grandes et pesées, regroupées par laine. Touchez une ligne pour ouvrir la fiche.';
+    total = formatYarn(tg, tm) + ' utilisé' + (entries.length > 1 ? 's' : '') +
+      ' · ' + entries.length + ' laine' + (entries.length > 1 ? 's' : '');
+    entries.forEach(({ ref, v }) => rows.push(statRow(
+      ref.nom + (ref.nomCouleur ? ' — ' + ref.nomCouleur : ''),
+      v.n + ' ligne' + (v.n > 1 ? 's' : '') + (v.m > 0 ? ' · ' + formatCount(v.m) + ' m' : ''),
+      'Poids',
+      formatCount(v.g) + ' g',
+      tg ? (v.g / tg) * 100 : 0,
+      () => openStock(ref.id)
+    )));
+  } else if (currentStat === 'stitches') {
+    const totalSt = allSessions.reduce((s, x) => s + (x.mailles || 0), 0);
+    const per = allProjects
+      .map((p) => ({ p, st: stitchesOf(p.id) }))
+      .filter((r) => r.st > 0)
+      .sort((a, b) => b.st - a.st);
+    title = 'Rangs cumulés';
+    hint = 'Répartition des rangs par projet. Touchez une ligne pour ouvrir le projet.';
+    total = formatCount(totalSt) + ' rangs au total';
+    per.forEach(({ p, st }) => rows.push(statRow(
+      p.nom,
+      STATUS_LABELS[p.status] || p.status,
+      'Rangs',
+      formatCount(st),
+      totalSt ? (st / totalSt) * 100 : 0,
+      () => openProject(p.id)
+    )));
+  }
+
+  $('stat-detail-title').textContent = title;
+  $('stat-detail-hint').textContent = hint;
+  $('stat-detail-total').textContent = total;
+  $('stat-detail-empty').textContent = rows.length ? '' : empty;
+  $('stat-detail-empty').classList.toggle('hidden', rows.length > 0);
+  rows.forEach((li) => list.appendChild(li));
 }
 
 // ---------- Minuteur ----------
