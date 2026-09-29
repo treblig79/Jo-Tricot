@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 /* ============================================================
    Carnet de Tricot — PWA pour iPad
@@ -307,8 +307,7 @@ function renderDashboard() {
   $('stat-projects').textContent = runningCount;
   $('stat-yarn').textContent = formatYarn(g, m);
   $('stat-stitches').textContent = formatCount(totalStitches);
-  $('stat-stock-value').textContent = formatEUR(totalStockValue());
-  $('stat-cost').textContent = formatEUR(allProjects.reduce((s, p) => s + costOfReturn(p.id), 0));
+  renderStockBox();
 
   // Classement par projet
   const ranked = allProjects
@@ -331,7 +330,7 @@ function renderDashboard() {
       '<div class="doc-stats">' +
         '<span class="mini-stat"><span class="mini-lbl">Temps</span><span class="mini-val">' +
           escapeHtml(formatDur(time)) + '</span></span>' +
-        '<span class="mini-stat"><span class="mini-lbl">Mailles</span><span class="mini-val">' +
+        '<span class="mini-stat"><span class="mini-lbl">Rangs</span><span class="mini-val">' +
           escapeHtml(formatCount(stitches)) + '</span></span>' +
         '<span class="mini-stat"><span class="mini-lbl">Laine</span><span class="mini-val">' +
           escapeHtml(formatYarn(yarn.g, yarn.m)) + '</span></span>' +
@@ -488,7 +487,7 @@ function syncTimerTick() {
   }
 }
 
-// ---------- Compteur de mailles ----------
+// ---------- Compteur de rangs ----------
 const STITCH_KEY = 'carnet-tricot:mailles';
 let stitchCounts = {};
 
@@ -533,10 +532,10 @@ function renderStitchUI() {
   stitchInput.value = count > 0 ? String(count) : '';
   $('btn-stitch-minus').disabled = count <= 0;
   stitchHint.textContent = count > 0
-    ? 'Séance en cours : ' + formatCount(count) + ' maille' + (count > 1 ? 's' : '') +
-      ' · total du projet : ' + formatCount(total) + ' mailles'
-    : 'Total du projet : ' + formatCount(total) + ' maille' + (total > 1 ? 's' : '') +
-      '. Appuyez sur « + 1 maille » à chaque maille.';
+    ? 'Séance en cours : ' + formatCount(count) + ' rang' + (count > 1 ? 's' : '') +
+      ' · total du projet : ' + formatCount(total) + ' rangs'
+    : 'Total du projet : ' + formatCount(total) + ' rang' + (total > 1 ? 's' : '') +
+      '. Appuyez sur « + 1 rang » à chaque rang.';
 }
 
 function bumpStitch(delta) {
@@ -593,7 +592,7 @@ function gramsUsed(laineId, onlyValidated) {
     .reduce((s, y) => s + (y.grammes || 0), 0);
 }
 
-// Stock officiel = acheté - validé (les consommations provisoires n'ôtent rien)
+// Stock officiel = acheté - validé (les engagements des projets en cours n'ôdent rien)
 function stockOfficial(laineId) {
   return purchasedGrams(laineId) + adjustmentOf(laineId) - gramsUsed(laineId, true);
 }
@@ -609,6 +608,8 @@ function stockForecast(laineId) {
 }
 
 function yarnCostOf(usage) {
+  // Un prix saisi dans le projet a priorité ; sinon on applique le prix moyen de la laine
+  if (typeof usage.prix === 'number') return usage.prix;
   if (!usage.laineId) return 0;
   return (usage.grammes || 0) * unitPriceOf(usage.laineId);
 }
@@ -658,9 +659,64 @@ function renderCost() {
   $('project-other-cost').value = other > 0 ? String(other) : '';
   $('btn-validate-usages').classList.toggle('hidden', !hasProvisional(p.id));
   $('cost-note').textContent = hasProvisional(p.id)
-    ? 'Les consommations marquées « Provisoire » ne sont pas encore déduites du stock : ' +
-      'elles le seront à la fin du projet.'
-    : 'Toutes les consommations sont validées : le stock est à jour.';
+    ? 'Les lignes « Engagée » ne sont pas encore déduites du stock : elles le seront ' +
+      'à la fin du projet (statut Terminé).'
+    : 'Toutes les lignes sont validées : le stock est à jour.';
+}
+
+// ---------- Rendu : Boîte inventaire (accueil) ----------
+function renderStockBox() {
+  const list = $('dash-stock-list');
+  const refs = allStock
+    .filter((s) => s.actif !== false && stockForecast(s.id) !== 0)
+    .slice()
+    .sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+
+  $('dash-stock-empty').classList.toggle('hidden', refs.length > 0);
+  list.innerHTML = '';
+
+  refs.forEach((s) => {
+    const prevu = Math.max(0, stockForecast(s.id));
+    const engage = Math.max(0, stockEngaged(s.id));
+    const li = document.createElement('li');
+    li.className = 'doc-item stock-row';
+
+    const dot = document.createElement('span');
+    dot.className = 'color-dot';
+    dot.style.background = s.couleur || '#c81e1e';
+
+    const meta = document.createElement('div');
+    meta.className = 'doc-meta';
+    meta.innerHTML = '<span class="doc-name"></span><span class="doc-detail"></span>';
+    meta.querySelector('.doc-name').textContent = s.nom || 'Laine';
+    meta.querySelector('.doc-detail').textContent =
+      formatCount(prevu) + ' g' + (s.nomCouleur ? ' · ' + s.nomCouleur : '');
+
+    li.appendChild(dot);
+    li.appendChild(meta);
+
+    // Indicateur : part de la quantité engagée dans un projet en cours
+    if (engage > 0) {
+      const flag = document.createElement('span');
+      flag.className = 'engaged-flag';
+      flag.textContent = formatCount(engage) + ' g engagés';
+      const bar = document.createElement('span');
+      bar.className = 'engaged-bar';
+      const fill = document.createElement('span');
+      fill.className = 'engaged-fill';
+      fill.style.width = Math.min(100, prevu > 0 ? (engage / (prevu + engage)) * 100 : 100) + '%';
+      bar.appendChild(fill);
+      const wrap = document.createElement('span');
+      wrap.className = 'engaged-wrap';
+      wrap.appendChild(bar);
+      wrap.appendChild(flag);
+      li.appendChild(wrap);
+      li.classList.add('has-engaged');
+    }
+
+    li.addEventListener('click', () => openStock(s.id));
+    list.appendChild(li);
+  });
 }
 
 // ---------- Rendu : Inventaire ----------
@@ -797,7 +853,7 @@ function renderYarnDetail() {
       ' · ' + formatEUR(yarnCostOf(u));
     const pill = document.createElement('span');
     pill.className = 'valid-pill ' + (u.valide ? 'valide' : 'provisoire');
-    pill.textContent = u.valide ? 'Validée' : 'Provisoire';
+    pill.textContent = u.valide ? 'Validée' : 'Engagée';
     li.appendChild(dot);
     li.appendChild(meta);
     li.appendChild(pill);
@@ -828,6 +884,7 @@ function renderProjectDetail() {
   renderTimerUI();
   renderStitchUI();
   renderCost();
+  updateYarnFormHint();
 }
 
 function renderSessions() {
@@ -841,7 +898,7 @@ function renderSessions() {
   $('sessions-empty').classList.toggle('hidden', sessions.length > 0);
   sessionsTotal.textContent = sessions.length
     ? sessions.length + ' session' + (sessions.length > 1 ? 's' : '') + ' · total ' + formatDur(total) +
-      (totalStitches > 0 ? ' · ' + formatCount(totalStitches) + ' mailles' : '')
+      (totalStitches > 0 ? ' · ' + formatCount(totalStitches) + ' rangs' : '')
     : '';
 
   sessions.forEach((s) => {
@@ -853,8 +910,8 @@ function renderSessions() {
     node.querySelector('.session-note').textContent = s.note || '';
     const pill = node.querySelector('.session-stitches');
     const st = Math.round(s.mailles || 0);
-    pill.textContent = formatCount(st) + ' M';
-    pill.title = st + (st > 1 ? ' mailles' : ' maille');
+    pill.textContent = formatCount(st) + ' R';
+    pill.title = st + (st > 1 ? ' rangs' : ' rang');
     pill.classList.toggle('hidden', st <= 0);
     node.querySelector('.btn-delete-mini').addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -878,8 +935,10 @@ function renderYarns() {
 
   yarnList.innerHTML = '';
   $('yarn-empty').classList.toggle('hidden', yarns.length > 0);
+  const engage = yarns.filter((y) => !y.valide);
   yarnTotal.textContent = yarns.length
     ? yarns.length + ' référence' + (yarns.length > 1 ? 's' : '') + ' · total ' + formatYarn(total.g, total.m) +
+      (engage.length ? ' · ' + formatCount(engage.reduce((s, y) => s + (y.grammes || 0), 0)) + ' g engagés' : '') +
       (yarnCostOfProject(p.id) > 0 ? ' · ' + formatEUR(yarnCostOfProject(p.id)) : '')
     : '';
 
@@ -890,14 +949,12 @@ function renderYarns() {
     const ref = y.laineId ? stockOf(y.laineId) : null;
     node.querySelector('.yarn-name').textContent = ref ? ref.nom : (y.nom || 'Laine');
     node.querySelector('.yarn-note').textContent = ref
-      ? 'Inventaire : ' + (ref.nomCouleur || ref.nom) + (y.note ? ' — ' + y.note : '')
+      ? (ref.nomCouleur || ref.nom) + (y.note ? ' — ' + y.note : '')
       : (y.note || 'Hors inventaire');
-    const vals = node.querySelectorAll('.mini-val');
-    vals[0].textContent = Math.round(y.grammes || 0) + ' g';
-    vals[1].textContent = Math.round(y.metres || 0) + ' m';
+    node.querySelector('.yarn-grams').textContent = formatCount(y.grammes || 0) + ' g';
     node.querySelector('.yarn-cost').textContent = formatEUR(yarnCostOf(y));
     const pill = node.querySelector('.valid-pill');
-    pill.textContent = y.valide ? 'Validée' : 'Provisoire';
+    pill.textContent = y.valide ? 'Validée' : 'Engagée';
     pill.classList.add(y.valide ? 'valide' : 'provisoire');
     node.querySelector('.btn-delete-mini').addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -925,7 +982,7 @@ function openProject(id) {
   $('session-note').value = '';
   $('yarn-name').value = '';
   $('yarn-grams').value = '';
-  $('yarn-metres').value = '';
+  $('yarn-prix').value = '';
   $('yarn-note').value = '';
   $('yarn-ref').value = '';
   showView('project');
@@ -1032,7 +1089,7 @@ $('btn-delete-project').addEventListener('click', async () => {
   showView('projects');
 });
 
-// ---------- Événements : compteur de mailles ----------
+// ---------- Événements : compteur de rangs ----------
 $('btn-stitch-plus').addEventListener('click', () => bumpStitch(1));
 $('btn-stitch-minus').addEventListener('click', () => bumpStitch(-1));
 $('btn-stitch-apply').addEventListener('click', applyStitchInput);
@@ -1124,8 +1181,9 @@ $('btn-delete-yarn').addEventListener('click', async () => {
   if (!s) return;
   const used = usagesOf(s.id);
   if (used.length > 0) {
-    alert('Cette laine est utilisée dans ' + used.length +
-      ' consommation(s) de projet. Désactivez-la plutôt que de la supprimer, pour conserver votre historique et vos coûts.');
+    const projets = new Set(used.map((u) => u.projetId)).size;
+    alert('Cette laine est engagée dans ' + projets + ' projet' + (projets > 1 ? 's' : '') +
+      '. Désactivez-la plutôt que de la supprimer, pour conserver votre historique et vos coûts.');
     return;
   }
   if (!confirm('Supprimer définitivement « ' + s.nom +' » et ses achats ?')) return;
@@ -1244,17 +1302,148 @@ function renderYarnReferenceSelect() {
 
 $('yarn-ref').addEventListener('change', () => {
   const s = stockOf($('yarn-ref').value);
-  if (s) $('yarn-name').value = s.nom;
+  if (s) $('yarn-name').value = s.nom + (s.nomCouleur ? ', ' + s.nomCouleur : '');
+  updateYarnFormHint();
+});
+$('yarn-grams').addEventListener('input', updateYarnFormHint);
+
+function updateYarnFormHint() {
+  const s = stockOf($('yarn-ref').value);
+  const grammes = Math.max(0, parseFloat($('yarn-grams').value) || 0);
+  if (!s) {
+    $('yarn-form-hint').textContent = $('yarn-ref').value
+      ? ''
+      : 'Hors inventaire : cette laine ne sera pas déduite du stock.';
+    return;
+  }
+  const prevu = stockForecast(s.id);
+  const engage = stockEngaged(s.id);
+  let txt = 'Disponible : ' + formatCount(prevu) + ' g';
+  if (engage > 0) txt += ' (dont ' + formatCount(engage) + ' g déjà engagées)';
+  if (purchasedGrams(s.id) > 0) txt += ' · prix moyen ' + formatEUR100(unitPriceOf(s.id));
+  if (grammes > prevu) txt += ' ⚠ Engagement supérieur au disponible.';
+  $('yarn-form-hint').textContent = txt;
+}
+
+// ---------- Modale : achat de laine ----------
+const NEW_REF = '__new__';
+
+function openPurchaseModal() {
+  const sel = $('pm-ref');
+  sel.innerHTML = '';
+  const choose = document.createElement('option');
+  choose.value = '';
+  choose.textContent = '— Choisir une laine —';
+  sel.appendChild(choose);
+  allStock
+    .filter((s) => s.actif !== false)
+    .slice()
+    .sort((a, b) => (a.nom || '').localeCompare(b.nom || ''))
+    .forEach((s) => {
+      const o = document.createElement('option');
+      o.value = s.id;
+      o.textContent = s.nom + (s.nomCouleur ? ' — ' + s.nomCouleur : '');
+      sel.appendChild(o);
+    });
+  const neu = document.createElement('option');
+  neu.value = NEW_REF;
+  neu.textContent = '+ Nouvelle laine…';
+  sel.appendChild(neu);
+  sel.value = '';
+  $('pm-name').value = '';
+  $('pm-desc').value = '';
+  $('pm-grams').value = '';
+  $('pm-prix').value = '';
+  $('pm-note').value = '';
+  $('pm-name-field').classList.add('hidden');
+  $('pm-info').textContent = '';
+  $('purchase-modal').classList.remove('hidden');
+}
+
+function closePurchaseModal() {
+  $('purchase-modal').classList.add('hidden');
+}
+
+$('btn-stock-purchase').addEventListener('click', openPurchaseModal);
+$('pm-cancel').addEventListener('click', closePurchaseModal);
+$('purchase-modal').addEventListener('click', (e) => {
+  if (e.target === $('purchase-modal')) closePurchaseModal();
+});
+
+$('pm-ref').addEventListener('change', () => {
+  const isNew = $('pm-ref').value === NEW_REF;
+  $('pm-name-field').classList.toggle('hidden', !isNew);
+  const s = stockOf($('pm-ref').value);
+  if (s) {
+    $('pm-desc').value = s.nom + (s.nomCouleur ? ', ' + s.nomCouleur : '');
+    $('pm-info').textContent = 'Disponible : ' + formatCount(stockForecast(s.id)) + ' g' +
+      (purchasedGrams(s.id) > 0 ? ' · prix moyen ' + formatEUR100(unitPriceOf(s.id)) : '');
+  } else {
+    $('pm-desc').value = '';
+    $('pm-info').textContent = isNew
+      ? 'Nouvelle référence : elle rejoindra l\'inventaire avec ce premier achat.'
+      : '';
+  }
+});
+
+$('pm-submit').addEventListener('click', async () => {
+  const grammes = Math.max(0, parseFloat($('pm-grams').value) || 0);
+  const prix = Math.max(0, parseFloat($('pm-prix').value) || 0);
+  if (grammes <= 0 && prix <= 0) {
+    $('pm-grams').focus();
+    return;
+  }
+  let laineId = $('pm-ref').value;
+  if (laineId === NEW_REF) {
+    const nom = $('pm-name').value.trim();
+    if (!nom) {
+      $('pm-name').focus();
+      return;
+    }
+    const ref = {
+      id: uid(),
+      nom,
+      couleur: '#c81e1e',
+      nomCouleur: $('pm-desc').value.trim() || '',
+      notes: '',
+      actif: true,
+      createdAt: Date.now(),
+    };
+    await putItem(STORES.lainesStock, ref);
+    allStock.push(ref);
+    laineId = ref.id;
+  }
+  if (!laineId) {
+    alert('Choisissez une laine de l\'inventaire, ou créez-en une nouvelle.');
+    return;
+  }
+  const achat = {
+    id: uid(),
+    laineId,
+    date: todayInput(),
+    grammes: grammes,
+    metres: 0,
+    prixTotal: prix,
+    note: $('pm-note').value.trim() || '',
+    createdAt: Date.now(),
+  };
+  await putItem(STORES.achats, achat);
+  allAchats.push(achat);
+  closePurchaseModal();
+  renderYarnReferenceSelect();
+  renderStock();
+  renderDashboard();
 });
 
 // ---------- Événements : laine ----------
 $('btn-add-yarn').addEventListener('click', async () => {
   const p = projectOf(currentProjectId);
   if (!p) return;
+  const ref = stockOf($('yarn-ref').value);
   const nom = $('yarn-name').value.trim();
-  const grammes = parseFloat($('yarn-grams').value) || 0;
-  const metres = parseFloat($('yarn-metres').value) || 0;
-  if (!nom && grammes <= 0 && metres <= 0) {
+  const grammes = Math.max(0, parseFloat($('yarn-grams').value) || 0);
+  const prixBrut = $('yarn-prix').value.trim();
+  if (!nom && grammes <= 0) {
     $('yarn-form-details').setAttribute('open', '');
     $('yarn-name').focus();
     return;
@@ -1263,9 +1452,10 @@ $('btn-add-yarn').addEventListener('click', async () => {
     id: uid(),
     projetId: p.id,
     laineId: $('yarn-ref').value || null,
-    nom: nom || 'Laine',
-    grammes: Math.max(0, grammes),
-    metres: Math.max(0, metres),
+    nom: nom || (ref ? ref.nom : 'Laine'),
+    grammes: grammes,
+    metres: 0,
+    prix: prixBrut === '' ? undefined : Math.max(0, parseFloat(prixBrut) || 0),
     note: $('yarn-note').value.trim() || '',
     valide: p.status === 'termine',
     createdAt: Date.now(),
@@ -1274,9 +1464,10 @@ $('btn-add-yarn').addEventListener('click', async () => {
   allYarns.push(yarn);
   $('yarn-name').value = '';
   $('yarn-grams').value = '';
-  $('yarn-metres').value = '';
+  $('yarn-prix').value = '';
   $('yarn-note').value = '';
   $('yarn-ref').value = '';
+  updateYarnFormHint();
   renderYarns();
   renderCost();
   renderStock();
@@ -1302,8 +1493,8 @@ $('btn-validate-usages').addEventListener('click', async () => {
   renderStock();
   renderDashboard();
   $('cost-note').textContent = n > 0
-    ? n + ' consommation' + (n > 1 ? 's' : '') + ' validée' + (n > 1 ? 's' : '') + ' : le stock est à jour.'
-    : 'Toutes les consommations sont déjà validées.';
+    ? n + ' engagement' + (n > 1 ? 's' : '') + ' validé' + (n > 1 ? 's' : '') + ' : le stock est à jour.'
+    : 'Toutes les lignes sont déjà validées.';
 });
 
 // ---------- Événements : minuteur ----------
@@ -1358,7 +1549,7 @@ btnTimerStop.addEventListener('click', async () => {
   renderTimerUI();
   renderStitchUI();
   timerHint.textContent = 'Session de ' + formatDur(minutes) + ' enregistrée' +
-    (stitches > 0 ? ' · ' + formatCount(stitches) + ' mailles' : '') + '.';
+    (stitches > 0 ? ' · ' + formatCount(stitches) + ' rangs' : '') + '.';
 });
 
 // Mise à jour de l'affichage chaque seconde

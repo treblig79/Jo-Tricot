@@ -427,6 +427,109 @@ main {
 .valid-pill.valide { background: #ecfdf5; color: var(--success); }
 .valid-pill.provisoire { background: #fffbeb; color: var(--wait); }
 
+/* ---- Accueil : projets + boîte inventaire ---- */
+.dash-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+@media (max-width: 900px) {
+  .dash-top { grid-template-columns: 1fr; }
+  .stock-box { max-width: 420px; }
+}
+.dash-main .toolbar { margin-bottom: 4px; }
+.dash-side { position: sticky; top: 12px; }
+
+.stock-box {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.stock-box-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.stock-box-head .panel-title { margin: 0; }
+.stock-box .doc-list { max-height: 300px; overflow-y: auto; }
+
+.btn-small { padding: 6px 10px; font-size: 0.82rem; border-radius: 10px; }
+.btn-block { width: 100%; }
+
+/* Ligne de stock dans la boîte */
+.stock-row { flex-wrap: wrap; }
+.stock-row.has-engaged {
+  background: #fffbeb;
+  box-shadow: inset 3px 0 0 var(--wait);
+  border-radius: 8px;
+}
+.engaged-wrap {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 0 44px;
+}
+.engaged-bar {
+  flex: 1 1 auto;
+  height: 6px;
+  min-width: 40px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.engaged-fill { display: block; height: 100%; background: var(--wait); }
+.engaged-flag {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--wait);
+  white-space: nowrap;
+}
+
+/* ---- Modale ---- */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 30, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 60;
+}
+.modal-card {
+  background: var(--bg);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+  padding: 20px;
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal-card .panel-title { margin-top: 0; }
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* ---- Aides de formulaire ---- */
+.detail-hint {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 8px 0 0;
+  line-height: 1.45;
+}
+
 /* ---- Coût de revient ---- */
 .cost-panel { margin-top: 16px; }
 .cost-line {

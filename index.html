@@ -19,11 +19,34 @@
   <main id="views">
     <!-- ===== Vue : Tableau de bord ===== -->
     <section id="view-dashboard" class="view active">
-      <div class="toolbar">
-        <button id="btn-new-project" class="btn btn-primary">
-          <span class="btn-icon">+</span> Nouveau projet
-        </button>
-        <button id="btn-open-stock" class="btn btn-secondary">Inventaire de laine</button>
+      <div class="dash-top">
+        <div class="dash-main">
+          <div class="toolbar">
+            <button id="btn-new-project" class="btn btn-primary">
+              <span class="btn-icon">+</span> Nouveau projet
+            </button>
+          </div>
+
+          <h2 class="section-title">Projets</h2>
+          <ul id="project-ranking" class="doc-list"></ul>
+          <p id="dashboard-empty" class="empty-state hidden">
+            Aucun projet pour le moment. Créez votre premier projet !
+          </p>
+        </div>
+
+        <aside class="dash-side">
+          <div class="stock-box">
+            <div class="stock-box-head">
+              <h3 class="panel-title">Inventaire de laine</h3>
+              <button id="btn-open-stock" class="btn btn-ghost btn-small">Voir tout</button>
+            </div>
+            <ul id="dash-stock-list" class="doc-list"></ul>
+            <p id="dash-stock-empty" class="empty-state hidden">Aucune laine en stock.</p>
+            <button id="btn-stock-purchase" class="btn btn-primary btn-block">
+              <span class="btn-icon">+</span> Achat de laine
+            </button>
+          </div>
+        </aside>
       </div>
 
       <div class="stats-grid">
@@ -40,24 +63,10 @@
           <span id="stat-yarn" class="stat-value">—</span>
         </div>
         <div class="stat-card">
-          <span class="stat-label">Mailles cumulées</span>
+          <span class="stat-label">Rangs cumulés</span>
           <span id="stat-stitches" class="stat-value">—</span>
         </div>
-        <div class="stat-card">
-          <span class="stat-label">Valeur du stock</span>
-          <span id="stat-stock-value" class="stat-value">—</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Coût de revient</span>
-          <span id="stat-cost" class="stat-value">—</span>
-        </div>
       </div>
-
-      <h2 class="section-title">Par projet</h2>
-      <ul id="project-ranking" class="doc-list"></ul>
-      <p id="dashboard-empty" class="empty-state hidden">
-        Aucun projet pour le moment. Créez votre premier projet !
-      </p>
 
       <h2 class="section-title">Dernières sessions</h2>
       <ul id="recent-sessions" class="doc-list"></ul>
@@ -112,11 +121,11 @@
           </div>
 
           <div class="stitch-box" id="stitch-box">
-            <p class="stitch-head">Mailles de la séance</p>
+            <p class="stitch-head">Rangs de la séance</p>
             <p class="stitch-display" id="stitch-display">0</p>
             <div class="stitch-controls">
-              <button id="btn-stitch-minus" class="btn stitch-minus" aria-label="Retirer une maille">− 1</button>
-              <button id="btn-stitch-plus" class="btn btn-primary">+ 1 maille</button>
+              <button id="btn-stitch-minus" class="btn stitch-minus" aria-label="Retirer un rang">− 1</button>
+              <button id="btn-stitch-plus" class="btn btn-primary">+ 1 rang</button>
             </div>
             <div class="stitch-manual">
               <label class="field">
@@ -141,7 +150,7 @@
               </label>
             </div>
             <label class="field">
-              <span>Mailles (facultatif)</span>
+              <span>Rangs (facultatif)</span>
               <input type="number" id="session-stitches" min="0" step="1" inputmode="numeric" placeholder="0">
             </label>
             <label class="field">
@@ -157,34 +166,35 @@
         </section>
 
         <section class="panel">
-          <h3 class="panel-title">Laine utilisée</h3>
+          <h3 class="panel-title">Laine</h3>
 
           <details class="details-form" id="yarn-form-details">
             <summary>Ajouter de la laine</summary>
             <label class="field">
-              <span>Référence de l'inventaire (facultatif)</span>
+              <span>1 · Laine</span>
               <select id="yarn-ref">
                 <option value="">Hors inventaire (non suivie)</option>
               </select>
             </label>
             <label class="field">
-              <span>Description (marque / modèle / couleur)</span>
+              <span>2 · Description de la laine</span>
               <input type="text" id="yarn-name" placeholder="Ex : Alpaga, couleur dentelle">
             </label>
             <div class="form-row2">
               <label class="field">
-                <span>Grammes (g)</span>
+                <span>3 · Grammes (g)</span>
                 <input type="number" id="yarn-grams" min="0" step="1" inputmode="decimal" placeholder="0">
               </label>
               <label class="field">
-                <span>Mètres (m)</span>
-                <input type="number" id="yarn-metres" min="0" step="1" inputmode="decimal" placeholder="0">
+                <span>4 · Prix (€, facultatif)</span>
+                <input type="number" id="yarn-prix" min="0" step="0.01" inputmode="decimal" placeholder="Automatique">
               </label>
             </div>
             <label class="field">
-              <span>Note (facultatif)</span>
+              <span>5 · Note (facultatif)</span>
               <input type="text" id="yarn-note" placeholder="Ex : reste 20 g">
             </label>
+            <p class="detail-hint" id="yarn-form-hint"></p>
             <button id="btn-add-yarn" class="btn btn-secondary">Ajouter cette laine</button>
           </details>
 
@@ -216,7 +226,7 @@
           <span>Coût par heure de tricot</span>
           <span class="cost-val" id="cost-per-hour">—</span>
         </div>
-        <button id="btn-validate-usages" class="btn btn-secondary hidden">Valider les consommations</button>
+        <button id="btn-validate-usages" class="btn btn-secondary hidden">Valider les engagements</button>
         <p class="cost-note" id="cost-note"></p>
       </section>
     </section>
@@ -430,9 +440,8 @@
         <span class="doc-detail yarn-note"></span>
       </div>
       <div class="doc-stats">
-        <span class="mini-stat"><span class="mini-lbl">Grammes</span><span class="mini-val"></span></span>
-        <span class="mini-stat"><span class="mini-lbl">Mètres</span><span class="mini-val"></span></span>
-        <span class="mini-stat"><span class="mini-lbl">Coût</span><span class="mini-val yarn-cost"></span></span>
+        <span class="mini-stat"><span class="mini-lbl">Grammes</span><span class="mini-val yarn-grams"></span></span>
+        <span class="mini-stat"><span class="mini-lbl">Prix</span><span class="mini-val yarn-cost"></span></span>
       </div>
       <span class="valid-pill"></span>
       <button class="btn-delete-mini" title="Supprimer">✕</button>
@@ -470,6 +479,44 @@
       <button class="btn-delete-mini" title="Supprimer">✕</button>
     </li>
   </template>
+
+  <!-- ===== Modale : achat de laine ===== -->
+  <div id="purchase-modal" class="modal hidden">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="purchase-modal-title">
+      <h3 class="panel-title" id="purchase-modal-title">Achat de laine</h3>
+      <label class="field">
+        <span>1 · Laine</span>
+        <select id="pm-ref"></select>
+      </label>
+      <label class="field hidden" id="pm-name-field">
+        <span>Nom de la nouvelle laine</span>
+        <input type="text" id="pm-name" placeholder="Ex : Drops Alpaca DK">
+      </label>
+      <label class="field">
+        <span>2 · Description de la laine</span>
+        <input type="text" id="pm-desc" placeholder="Ex : Drops Alpaca DK, rouge carmin">
+      </label>
+      <div class="form-row2">
+        <label class="field">
+          <span>3 · Grammes (g)</span>
+          <input type="number" id="pm-grams" min="0" step="1" inputmode="decimal" placeholder="0">
+        </label>
+        <label class="field">
+          <span>4 · Prix payé (€)</span>
+          <input type="number" id="pm-prix" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+        </label>
+      </div>
+      <label class="field">
+        <span>5 · Note (facultatif)</span>
+        <input type="text" id="pm-note" placeholder="Ex : solde, lot de 3 écheveaux">
+      </label>
+      <p class="detail-hint" id="pm-info"></p>
+      <div class="modal-actions">
+        <button id="pm-cancel" class="btn btn-ghost">Annuler</button>
+        <button id="pm-submit" class="btn btn-primary">Enregistrer l'achat</button>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
