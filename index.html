@@ -23,6 +23,7 @@
         <button id="btn-new-project" class="btn btn-primary">
           <span class="btn-icon">+</span> Nouveau projet
         </button>
+        <button id="btn-open-stock" class="btn btn-secondary">Inventaire de laine</button>
       </div>
 
       <div class="stats-grid">
@@ -41,6 +42,14 @@
         <div class="stat-card">
           <span class="stat-label">Mailles cumulées</span>
           <span id="stat-stitches" class="stat-value">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Valeur du stock</span>
+          <span id="stat-stock-value" class="stat-value">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Coût de revient</span>
+          <span id="stat-cost" class="stat-value">—</span>
         </div>
       </div>
 
@@ -153,6 +162,12 @@
           <details class="details-form" id="yarn-form-details">
             <summary>Ajouter de la laine</summary>
             <label class="field">
+              <span>Référence de l'inventaire (facultatif)</span>
+              <select id="yarn-ref">
+                <option value="">Hors inventaire (non suivie)</option>
+              </select>
+            </label>
+            <label class="field">
               <span>Description (marque / modèle / couleur)</span>
               <input type="text" id="yarn-name" placeholder="Ex : Alpaga, couleur dentelle">
             </label>
@@ -176,6 +191,162 @@
           <p id="yarn-total" class="list-total"></p>
           <ul id="yarn-list" class="doc-list"></ul>
           <p id="yarn-empty" class="empty-state hidden">Aucune laine enregistrée.</p>
+        </section>
+      </div>
+
+      <section class="panel cost-panel">
+        <h3 class="panel-title">Coût de revient</h3>
+        <div class="cost-line">
+          <span>Laine consommée</span>
+          <span class="cost-val" id="cost-yarn">—</span>
+        </div>
+        <div class="cost-line">
+          <span>Autres frais (motif, aiguilles…)</span>
+          <span class="cost-val" id="cost-other">—</span>
+        </div>
+        <label class="field cost-field">
+          <span>Saisir les autres frais (€)</span>
+          <input type="number" id="project-other-cost" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+        </label>
+        <div class="cost-line total">
+          <span>Total</span>
+          <span class="cost-val" id="cost-total">—</span>
+        </div>
+        <div class="cost-line">
+          <span>Coût par heure de tricot</span>
+          <span class="cost-val" id="cost-per-hour">—</span>
+        </div>
+        <button id="btn-validate-usages" class="btn btn-secondary hidden">Valider les consommations</button>
+        <p class="cost-note" id="cost-note"></p>
+      </section>
+    </section>
+
+    <!-- ===== Vue : Inventaire de laine ===== -->
+    <section id="view-laine" class="view">
+      <div class="toolbar">
+        <button id="btn-stock-back" class="btn btn-ghost">← Accueil</button>
+        <button id="btn-new-stock" class="btn btn-primary">
+          <span class="btn-icon">+</span> Nouvelle laine
+        </button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Valeur du stock</span>
+          <span id="stock-value" class="stat-value">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Masse en stock</span>
+          <span id="stock-mass" class="stat-value">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Total dépensé</span>
+          <span id="stock-spent" class="stat-value">—</span>
+        </div>
+      </div>
+
+      <details class="details-form" id="stock-form-details">
+        <summary>Nouvelle référence de laine</summary>
+        <label class="field">
+          <span>Nom (marque, modèle)</span>
+          <input type="text" id="stf-nom" placeholder="Ex : Drops Alpaca DK">
+        </label>
+        <div class="form-row2">
+          <label class="field">
+            <span>Couleur</span>
+            <input type="color" id="stf-couleur" value="#c81e1e">
+          </label>
+          <label class="field">
+            <span>Couleur (nom, facultatif)</span>
+            <input type="text" id="stf-nom-couleur" placeholder="Ex : rouge carmin">
+          </label>
+        </div>
+        <label class="field">
+          <span>Notes (facultatif)</span>
+          <input type="text" id="stf-notes" placeholder="Ex : 4 pelotes restantes…">
+        </label>
+        <button id="btn-add-stock" class="btn btn-secondary">Ajouter la laine</button>
+      </details>
+
+      <h2 class="section-title">Mes laines</h2>
+      <ul id="stock-list" class="doc-list"></ul>
+      <p id="stock-empty" class="empty-state hidden">Aucune laine à l'inventaire.</p>
+    </section>
+
+    <!-- ===== Vue : Détail d'une laine ===== -->
+    <section id="view-yarn" class="view">
+      <div class="project-header">
+        <button id="btn-yarn-back" class="btn btn-ghost">← Laine</button>
+        <div class="project-heading">
+          <h2 id="yarn-detail-title"></h2>
+          <span id="yarn-detail-badge" class="badge"></span>
+        </div>
+        <div class="project-actions">
+          <button id="btn-edit-yarn" class="btn btn-secondary">Modifier</button>
+          <button id="btn-toggle-yarn" class="btn btn-secondary">Désactiver</button>
+          <button id="btn-delete-yarn" class="btn btn-danger">Supprimer</button>
+        </div>
+      </div>
+
+      <div class="project-meta" id="yarn-detail-meta"></div>
+
+      <details class="details-form" id="adjust-form-details">
+        <summary>Ajuster la quantité disponible</summary>
+        <p class="detail-hint">Indiquez ce que vous avez réellement en main : pertes, écheveau donné, reste non compté… Le stock est recalculé automatiquement.</p>
+        <div class="form-row2">
+          <label class="field">
+            <span>Quantité disponible réelle (g)</span>
+            <input type="number" id="adj-grammes" min="0" step="1" inputmode="decimal" placeholder="0">
+          </label>
+          <label class="field">
+            <span>Raison (facultatif)</span>
+            <input type="text" id="adj-note" placeholder="Ex : don, perte, reste">
+          </label>
+        </div>
+        <button id="btn-apply-adjust" class="btn btn-secondary">Recalculer le stock</button>
+      </details>
+
+      <div class="cols">
+        <section class="panel">
+          <h3 class="panel-title">Achats</h3>
+
+          <details class="details-form" id="purchase-form-details">
+            <summary>Ajouter un achat</summary>
+            <label class="field">
+              <span>Date de l'achat</span>
+              <input type="date" id="pur-date">
+            </label>
+            <div class="form-row2">
+              <label class="field">
+                <span>Quantité (g)</span>
+                <input type="number" id="pur-grammes" min="0" step="1" inputmode="decimal" placeholder="0">
+              </label>
+              <label class="field">
+                <span>Prix payé (€)</span>
+                <input type="number" id="pur-prix" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+              </label>
+            </div>
+            <label class="field">
+              <span>Mètres (facultatif)</span>
+              <input type="number" id="pur-metres" min="0" step="1" inputmode="decimal" placeholder="0">
+            </label>
+            <label class="field">
+              <span>Note (facultatif)</span>
+              <input type="text" id="pur-note" placeholder="Ex : solde, lot de 3 écheveaux">
+            </label>
+            <button id="btn-add-purchase" class="btn btn-secondary">Ajouter cet achat</button>
+          </details>
+
+          <p id="purchases-total" class="list-total"></p>
+          <ul id="purchase-list" class="doc-list"></ul>
+          <p id="purchases-empty" class="empty-state hidden">Aucun achat enregistré.</p>
+        </section>
+
+        <section class="panel">
+          <h3 class="panel-title">Consommation</h3>
+          <p id="yarn-usage-total" class="list-total"></p>
+          <ul id="yarn-usage-list" class="doc-list"></ul>
+          <p id="yarn-usage-empty" class="empty-state hidden">Aucune consommation.</p>
         </section>
       </div>
     </section>
@@ -261,6 +432,40 @@
       <div class="doc-stats">
         <span class="mini-stat"><span class="mini-lbl">Grammes</span><span class="mini-val"></span></span>
         <span class="mini-stat"><span class="mini-lbl">Mètres</span><span class="mini-val"></span></span>
+        <span class="mini-stat"><span class="mini-lbl">Coût</span><span class="mini-val yarn-cost"></span></span>
+      </div>
+      <span class="valid-pill"></span>
+      <button class="btn-delete-mini" title="Supprimer">✕</button>
+    </li>
+  </template>
+
+  <template id="stock-item-template">
+    <li class="doc-item">
+      <span class="color-dot"></span>
+      <div class="doc-meta">
+        <span class="doc-name stock-name"></span>
+        <span class="doc-detail stock-color-name"></span>
+      </div>
+      <div class="doc-stats">
+        <span class="mini-stat"><span class="mini-lbl">Stock</span><span class="mini-val stock-official"></span></span>
+        <span class="mini-stat"><span class="mini-lbl">Engagé</span><span class="mini-val stock-engaged"></span></span>
+        <span class="mini-stat"><span class="mini-lbl">Prévisionnel</span><span class="mini-val stock-forecast"></span></span>
+        <span class="mini-stat"><span class="mini-lbl">Prix</span><span class="mini-val stock-price"></span></span>
+      </div>
+      <span class="inactive-pill hidden">Inactive</span>
+    </li>
+  </template>
+
+  <template id="purchase-item-template">
+    <li class="doc-item no-click">
+      <div class="session-date"></div>
+      <div class="doc-meta">
+        <span class="doc-name purchase-qty"></span>
+        <span class="doc-detail purchase-note"></span>
+      </div>
+      <div class="doc-stats">
+        <span class="mini-stat"><span class="mini-lbl">Prix</span><span class="mini-val purchase-price"></span></span>
+        <span class="mini-stat"><span class="mini-lbl">Le gramme</span><span class="mini-val purchase-unit"></span></span>
       </div>
       <button class="btn-delete-mini" title="Supprimer">✕</button>
     </li>

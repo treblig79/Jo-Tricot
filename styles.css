@@ -395,6 +395,63 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- Inventaire de laine ---- */
+.color-dot {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.12);
+  display: block;
+}
+.doc-item.inactive .doc-name,
+.doc-item.inactive .doc-stats { opacity: 0.5; }
+.inactive-pill {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  white-space: nowrap;
+}
+.valid-pill {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.valid-pill.valide { background: #ecfdf5; color: var(--success); }
+.valid-pill.provisoire { background: #fffbeb; color: var(--wait); }
+
+/* ---- Coût de revient ---- */
+.cost-panel { margin-top: 16px; }
+.cost-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.cost-line .cost-val { font-weight: 700; color: var(--text); white-space: nowrap; }
+.cost-line.total {
+  border-bottom: none;
+  border-top: 2px solid var(--border);
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--text);
+  font-size: 1.05rem;
+}
+.cost-line.total .cost-val { color: var(--primary); font-size: 1.25rem; }
+.cost-field { margin: 10px 0 4px; max-width: 320px; }
+.cost-note { color: var(--muted); font-size: 0.8rem; margin: 10px 0 0; }
+
 .sr-only {
   position: absolute; width: 1px; height: 1px;
   margin: -1px; padding: 0; overflow: hidden;
