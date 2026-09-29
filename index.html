@@ -190,6 +190,27 @@
                 <option value="">Hors inventaire (non suivie)</option>
               </select>
             </label>
+            <div id="yarn-new-ref" class="new-ref-box hidden">
+              <p class="detail-hint">Cette laine sera créée dans l'inventaire puis sélectionnée automatiquement.</p>
+              <label class="field">
+                <span>Nom (marque, modèle)</span>
+                <input type="text" id="ynr-nom" placeholder="Ex : Drops Alpaca DK">
+              </label>
+              <div class="form-row2">
+                <label class="field">
+                  <span>Couleur (nom, facultatif)</span>
+                  <input type="text" id="ynr-couleur" placeholder="Ex : vert sapin">
+                </label>
+                <label class="field">
+                  <span>Poids en stock (g, facultatif)</span>
+                  <input type="number" id="ynr-poids" min="0" step="1" inputmode="decimal" placeholder="0">
+                </label>
+              </div>
+              <div class="form-actions">
+                <button id="btn-new-ref-cancel" class="btn btn-ghost">Annuler</button>
+                <button id="btn-new-ref-save" class="btn btn-secondary">Créer la laine</button>
+              </div>
+            </div>
             <label class="field">
               <span>2 · Description de la laine</span>
               <input type="text" id="yarn-name" placeholder="Ex : Alpaga, couleur dentelle">
@@ -554,6 +575,16 @@
         <span>Nom de la nouvelle laine</span>
         <input type="text" id="pm-name" placeholder="Ex : Drops Alpaca DK">
       </label>
+      <div class="form-row2 hidden" id="pm-color-row">
+        <label class="field">
+          <span>Couleur</span>
+          <input type="color" id="pm-couleur" value="#c81e1e">
+        </label>
+        <label class="field">
+          <span>Couleur (nom, facultatif)</span>
+          <input type="text" id="pm-nom-couleur" placeholder="Ex : vert sapin">
+        </label>
+      </div>
       <label class="field">
         <span>2 · Description de la laine</span>
         <input type="text" id="pm-desc" placeholder="Ex : Drops Alpaca DK, rouge carmin">

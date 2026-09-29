@@ -1361,6 +1361,7 @@ function openProject(id) {
   currentProjectId = id;
   $('manual-session-details').removeAttribute('open');
   $('yarn-form-details').removeAttribute('open');
+  setNewRefBox(false);
   $('session-date').value = todayInput();
   $('session-duration').value = '';
   $('session-stitches').value = '';
@@ -1569,6 +1570,39 @@ $('btn-new-stock').addEventListener('click', () => {
   $('stf-nom').focus();
 });
 
+// Applique le poids et le prix saisis sur une référence.
+// Retourne un message d'erreur, ou une chaîne vide si tout est bon.
+function applyWeightAndPrice(ref, poids, prix) {
+  if (prix > 0 && !(poids > 0)) {
+    return 'Indiquez le poids en stock (g) pour que le prix pour 100 g soit calculé.';
+  }
+  // Le poids saisi devient le stock officiel : on passe par l'ajustement pour
+  // conserver l'historique des achats et ne jamais casser les validations de projets.
+  if (poids !== null) {
+    const engage = stockEngaged(ref.id);
+    if (poids < engage) {
+      return 'Impossible : ' + Math.round(engage) + ' g de cette laine sont engagés dans un projet en cours.\n' +
+        'Libérez d\'abord ces quantités, ou indiquez un poids supérieur ou égal à ' +
+        Math.round(engage) + ' g.';
+    }
+    ref.ajustementG = poids - purchasedGrams(ref.id) + gramsUsed(ref.id, true);
+    ref.ajustementNote = ref.ajustementG === 0 ? '' : 'Poids saisi sur la fiche';
+  }
+  // Prix payé -> prix de base pour 100 g
+  ref.prixBase = prix > 0 && poids > 0 ? (prix / poids) * 100 : 0;
+  return '';
+}
+
+// Enregistre une référence et met à jour tous les affichages
+async function saveStockRef(ref) {
+  await putItem(STORES.lainesStock, ref);
+  allStock = allStock.filter((x) => x.id !== ref.id);
+  allStock.push(ref);
+  renderStock();
+  renderYarnReferenceSelect();
+  renderDashboard();
+}
+
 $('btn-add-stock').addEventListener('click', async () => {
   const nom = $('stf-nom').value.trim();
   if (!nom) {
@@ -1589,37 +1623,17 @@ $('btn-add-stock').addEventListener('click', async () => {
   const prixBrut = $('stf-prix').value.trim();
   const prix = prixBrut === '' ? 0 : Math.max(0, parseFloat(prixBrut) || 0);
 
-  if (prix > 0 && !(poids > 0)) {
-    alert('Indiquez le poids en stock (g) pour que le prix pour 100 g soit calculé.');
-    $('stf-poids').focus();
+  const erreur = applyWeightAndPrice(ref, poids, prix);
+  if (erreur) {
+    alert(erreur);
+    if (prix > 0 && !(poids > 0)) $('stf-poids').focus();
     return;
   }
-  // Le poids saisi devient le stock officiel : on passe par l'ajustement pour
-  // conserver l'historique des achats et ne jamais casser les validations de projets.
-  if (poids !== null) {
-    const engage = stockEngaged(ref.id);
-    if (poids < engage) {
-      alert('Impossible : ' + Math.round(engage) + ' g de cette laine sont engagés dans un projet en cours.\n' +
-        'Libérez d\'abord ces quantités, ou indiquez un poids supérieur ou égal à ' +
-        Math.round(engage) + ' g.');
-      $('stf-poids').focus();
-      return;
-    }
-    ref.ajustementG = poids - purchasedGrams(ref.id) + gramsUsed(ref.id, true);
-    ref.ajustementNote = ref.ajustementG === 0 ? '' : 'Poids saisi sur la fiche';
-  }
-  // Prix payé -> prix de base pour 100 g
-  ref.prixBase = prix > 0 && poids > 0 ? (prix / poids) * 100 : 0;
 
-  await putItem(STORES.lainesStock, ref);
-  allStock = allStock.filter((x) => x.id !== ref.id);
-  allStock.push(ref);
+  await saveStockRef(ref);
   currentStockId = ref.id;
   const enEdition = !!editingStockId;
   resetStockForm();
-  renderStock();
-  renderYarnReferenceSelect();
-  renderDashboard();
   if (enEdition && currentStockId) {
     renderYarnDetail();
     renderCost();
@@ -1768,6 +1782,9 @@ $('btn-add-session').addEventListener('click', async () => {
   renderDashboard();
 });
 
+// ---------- Sélection de la laine d'un projet ----------
+const NEW_REF = '__new__';
+
 function renderYarnReferenceSelect() {
   const sel = $('yarn-ref');
   const keep = sel.value;
@@ -1786,12 +1803,71 @@ function renderYarnReferenceSelect() {
       o.textContent = s.nom + (s.nomCouleur ? ' — ' + s.nomCouleur : '');
       sel.appendChild(o);
     });
+  const neu = document.createElement('option');
+  neu.value = NEW_REF;
+  neu.textContent = '+ Nouvelle laine…';
+  sel.appendChild(neu);
   sel.value = keep;
 }
 
+// Affiche / masque le bloc de création rapide d'une laine
+function setNewRefBox(open) {
+  $('yarn-new-ref').classList.toggle('hidden', !open);
+  if (open) {
+    $('ynr-nom').focus();
+  } else {
+    $('ynr-nom').value = '';
+    $('ynr-couleur').value = '';
+    $('ynr-poids').value = '';
+  }
+}
+
 $('yarn-ref').addEventListener('change', () => {
+  if ($('yarn-ref').value === NEW_REF) {
+    setNewRefBox(true);
+    updateYarnFormHint();
+    return;
+  }
+  setNewRefBox(false);
   const s = stockOf($('yarn-ref').value);
   if (s) $('yarn-name').value = s.nom + (s.nomCouleur ? ', ' + s.nomCouleur : '');
+  updateYarnFormHint();
+});
+
+$('btn-new-ref-cancel').addEventListener('click', () => {
+  $('yarn-ref').value = '';
+  setNewRefBox(false);
+  updateYarnFormHint();
+});
+
+// Crée la laine dans l'inventaire, puis la sélectionne dans le formulaire du projet
+$('btn-new-ref-save').addEventListener('click', async () => {
+  const nom = $('ynr-nom').value.trim();
+  if (!nom) {
+    $('ynr-nom').focus();
+    return;
+  }
+  const poidsBrut = $('ynr-poids').value.trim();
+  const poids = poidsBrut === '' ? null : Math.max(0, parseFloat(poidsBrut) || 0);
+  const ref = {
+    id: uid(),
+    createdAt: Date.now(),
+    actif: true,
+    nom,
+    couleur: '#c81e1e',
+    nomCouleur: $('ynr-couleur').value.trim(),
+    notes: '',
+  };
+  // Pas de prix saisi ici : à défaut, le prix moyen des achats fera foi
+  const erreur = applyWeightAndPrice(ref, poids, 0);
+  if (erreur) {
+    alert(erreur);
+    return;
+  }
+  await saveStockRef(ref);
+  setNewRefBox(false);
+  $('yarn-ref').value = ref.id;
+  $('yarn-name').value = ref.nom + (ref.nomCouleur ? ', ' + ref.nomCouleur : '');
   updateYarnFormHint();
 });
 $('yarn-grams').addEventListener('input', updateYarnFormHint);
@@ -1800,9 +1876,12 @@ function updateYarnFormHint() {
   const s = stockOf($('yarn-ref').value);
   const grammes = Math.max(0, parseFloat($('yarn-grams').value) || 0);
   if (!s) {
-    $('yarn-form-hint').textContent = $('yarn-ref').value
-      ? ''
-      : 'Hors inventaire : cette laine ne sera pas déduite du stock.';
+    const v = $('yarn-ref').value;
+    $('yarn-form-hint').textContent = v === NEW_REF
+      ? 'Créez la laine ci-dessus : elle rejoindra l\'inventaire et sera sélectionnée ici.'
+      : v
+        ? ''
+        : 'Hors inventaire : cette laine ne sera pas déduite du stock.';
     return;
   }
   const prevu = stockForecast(s.id);
@@ -1815,8 +1894,6 @@ function updateYarnFormHint() {
 }
 
 // ---------- Modale : achat de laine ----------
-const NEW_REF = '__new__';
-
 function openPurchaseModal() {
   const sel = $('pm-ref');
   sel.innerHTML = '';
@@ -1844,7 +1921,10 @@ function openPurchaseModal() {
   $('pm-grams').value = '';
   $('pm-prix').value = '';
   $('pm-note').value = '';
+  $('pm-couleur').value = '#c81e1e';
+  $('pm-nom-couleur').value = '';
   $('pm-name-field').classList.add('hidden');
+  $('pm-color-row').classList.add('hidden');
   $('pm-info').textContent = '';
   $('purchase-modal').classList.remove('hidden');
 }
@@ -1862,15 +1942,17 @@ $('purchase-modal').addEventListener('click', (e) => {
 $('pm-ref').addEventListener('change', () => {
   const isNew = $('pm-ref').value === NEW_REF;
   $('pm-name-field').classList.toggle('hidden', !isNew);
+  $('pm-color-row').classList.toggle('hidden', !isNew);
   const s = stockOf($('pm-ref').value);
   if (s) {
     $('pm-desc').value = s.nom + (s.nomCouleur ? ', ' + s.nomCouleur : '');
     $('pm-info').textContent = 'Disponible : ' + formatCount(stockForecast(s.id)) + ' g' +
-      (purchasedGrams(s.id) > 0 ? ' · prix moyen ' + formatPrice100(unitPriceOf(s.id)) : '');
+      (purchasedGrams(s.id) > 0 ? ' · prix moyen ' + formatPrice100(unitPriceOf(s.id)) : '') +
+      (s.nomCouleur ? ' · couleur ' + s.nomCouleur : '');
   } else {
     $('pm-desc').value = '';
     $('pm-info').textContent = isNew
-      ? 'Nouvelle référence : elle rejoindra l\'inventaire avec ce premier achat.'
+      ? 'Nouvelle référence : couleur et nom lui seront attribués, et elle rejoindra l\'inventaire avec ce premier achat.'
       : '';
   }
 });
@@ -1889,12 +1971,16 @@ $('pm-submit').addEventListener('click', async () => {
       $('pm-name').focus();
       return;
     }
+    const nomCouleur = $('pm-nom-couleur').value.trim();
+    const desc = $('pm-desc').value.trim();
     const ref = {
       id: uid(),
       nom,
-      couleur: '#c81e1e',
-      nomCouleur: $('pm-desc').value.trim() || '',
-      notes: '',
+      couleur: $('pm-couleur').value || '#c81e1e',
+      // Le champ « Couleur (nom) » prime, sinon on retombe sur la description
+      nomCouleur: nomCouleur || desc,
+      // La description n'est pas perdue : elle devient une note de la référence
+      notes: nomCouleur ? desc : '',
       actif: true,
       createdAt: Date.now(),
     };

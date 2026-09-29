@@ -626,6 +626,16 @@ main {
 .cost-field { margin: 10px 0 4px; max-width: 320px; }
 .cost-note { color: var(--muted); font-size: 0.8rem; margin: 10px 0 0; }
 
+/* ---- Création rapide d'une laine depuis un projet ---- */
+.new-ref-box {
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px dashed var(--primary-light);
+  border-radius: var(--radius);
+  background: #f7f4ff;
+}
+.new-ref-box .form-actions { margin-top: 4px; }
+
 /* ---- Clôture du projet : photo, instructions ---- */
 .close-panel { margin-top: 16px; }
 .photo-box { margin: 12px 0 16px; }
