@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'carnet-tricot-v10';
+const CACHE_NAME = 'carnet-tricot-v11';
 const ASSETS = [
   './',
   'index.html',

@@ -222,12 +222,43 @@
           <span>Total</span>
           <span class="cost-val" id="cost-total">—</span>
         </div>
-        <div class="cost-line">
-          <span>Coût par heure de tricot</span>
-          <span class="cost-val" id="cost-per-hour">—</span>
-        </div>
         <button id="btn-validate-usages" class="btn btn-secondary hidden">Valider les engagements</button>
         <p class="cost-note" id="cost-note"></p>
+      </section>
+
+      <section class="panel close-panel">
+        <h3 class="panel-title">Projet terminé</h3>
+        <p class="detail-hint" id="close-hint"></p>
+        <div class="photo-box">
+          <img id="project-photo" class="project-photo-img hidden" alt="Photo du projet réalisé">
+          <div class="photo-actions">
+            <label class="btn btn-secondary" for="project-photo-input">Choisir une photo</label>
+            <input type="file" id="project-photo-input" accept="image/*" class="visually-hidden">
+            <button id="btn-delete-photo" class="btn btn-ghost hidden">Retirer la photo</button>
+          </div>
+          <p class="detail-hint" id="photo-hint">Photo prise avec l'appareil ou choisie dans la photothèque de l'iPad.</p>
+        </div>
+        <div class="form-actions">
+          <button id="btn-project-finish" class="btn btn-primary">Marquer comme terminé</button>
+          <button id="btn-project-reopen" class="btn btn-ghost hidden">Rouvrir le projet</button>
+          <button id="btn-project-instructions" class="btn btn-secondary">Instructions</button>
+        </div>
+      </section>
+    </section>
+
+    <!-- ===== Vue : Instructions d'un projet ===== -->
+    <section id="view-instructions" class="view">
+      <div class="toolbar">
+        <button id="btn-instructions-back" class="btn btn-ghost">← Projet</button>
+        <button id="btn-instructions-save" class="btn btn-primary">Enregistrer</button>
+      </div>
+      <section class="panel">
+        <h3 class="panel-title" id="instructions-title">Instructions</h3>
+        <label class="field">
+          <span>Comment réaliser ce projet</span>
+          <textarea id="instructions-text" rows="18" placeholder="Ex : monter 60 mailles en maille 3/2, tricoter 12 rangs de jersey, diminuer de 2 mailles tous les 2 rangs…"></textarea>
+        </label>
+        <p class="detail-hint" id="instructions-hint">Texte libre : dimensions, aiguilles, points utilisés, conseils…</p>
       </section>
     </section>
 

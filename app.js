@@ -15,6 +15,7 @@ const views = {
   projectForm: $('view-project-form'),
   laine: $('view-laine'),
   yarn: $('view-yarn'),
+  instructions: $('view-instructions'),
 };
 
 const projectList = $('project-list');
@@ -254,6 +255,7 @@ function showView(name) {
   if (name === 'project') renderProjectDetail();
   if (name === 'laine') renderStock();
   if (name === 'yarn') renderYarnDetail();
+  if (name === 'instructions') renderInstructions();
 }
 
 function showMessage(msg, type) {
@@ -670,12 +672,10 @@ function renderCost() {
   const yarn = yarnCostOfProject(p.id);
   const other = p.autresFrais || 0;
   const total = yarn + other;
-  const hours = timeOf(p.id) / 60;
 
   $('cost-yarn').textContent = formatPrice(yarn);
   $('cost-other').textContent = formatPrice(other);
   $('cost-total').textContent = formatPrice(total);
-  $('cost-per-hour').textContent = hours > 0 ? formatPrice(total / hours) + ' / h' : '—';
   $('project-other-cost').value = other > 0 ? String(other) : '';
   $('btn-validate-usages').classList.toggle('hidden', !hasProvisional(p.id));
   $('cost-note').textContent = hasProvisional(p.id)
@@ -953,8 +953,164 @@ function renderProjectDetail() {
   renderTimerUI();
   renderStitchUI();
   renderCost();
+  renderProjectClosing();
   updateYarnFormHint();
 }
+
+// ---------- Clôture du projet : photo, statut, instructions ----------
+function renderProjectClosing() {
+  const p = currentProjectId ? projectOf(currentProjectId) : null;
+  if (!p) return;
+  const termine = p.status === 'termine';
+
+  $('btn-project-finish').classList.toggle('hidden', termine);
+  $('btn-project-reopen').classList.toggle('hidden', !termine);
+  const engage = hasProvisional(p.id);
+  $('close-hint').textContent = termine
+    ? 'Projet terminé : les quantités de laine sont déduites du stock. Vous pouvez rouvrir le projet si besoin.'
+    : engage
+      ? 'En marquant le projet comme terminé, les ' + 'lignes « Engagée » seront validées et déduites du stock.'
+      : 'Marquez ce projet comme terminé quand il est réalisé.';
+
+  // Photo
+  const img = $('project-photo');
+  if (p.photo) {
+    img.src = p.photo;
+    img.classList.remove('hidden');
+  } else {
+    img.removeAttribute('src');
+    img.classList.add('hidden');
+  }
+  $('btn-delete-photo').classList.toggle('hidden', !p.photo);
+
+  // Instructions
+  $('btn-project-instructions').textContent =
+    (p.instructions || '').trim() ? 'Modifier les instructions' : 'Instructions';
+}
+
+// Réduit l'image avant stockage (l'iPad fournit de très gros fichiers)
+function shrinkImage(file, maxSize, quality) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error('lecture impossible'));
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('image illisible'));
+      img.onload = () => {
+        const w0 = img.naturalWidth || img.width;
+        const h0 = img.naturalHeight || img.height;
+        const ratio = Math.min(1, (maxSize || 1400) / Math.max(w0, h0));
+        const w = Math.max(1, Math.round(w0 * ratio));
+        const h = Math.max(1, Math.round(h0 * ratio));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality || 0.82));
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+function renderInstructions() {
+  const p = currentProjectId ? projectOf(currentProjectId) : null;
+  if (!p) {
+    showView('projects');
+    return;
+  }
+  $('instructions-title').textContent = 'Instructions — ' + p.nom;
+  $('instructions-text').value = p.instructions || '';
+  $('instructions-hint').textContent = p.instructions
+    ? 'Enregistré le ' + formatDateStr(p.instructionsDate || p.dateDebut || '') + '.'
+    : 'Rien d\'écrit pour le moment.';
+}
+
+// Passe le projet en « Terminé » : les engagements sont validés, le stock mis à jour
+$('btn-project-finish').addEventListener('click', async () => {
+  const p = currentProjectId ? projectOf(currentProjectId) : null;
+  if (!p) return;
+  const engage = hasProvisional(p.id);
+  if (engage && !confirm(
+    'Marquer ce projet comme terminé ?\n\n' +
+    'Les quantités de laine encore « Engagées » seront validées et déduites du stock.'
+  )) return;
+
+  p.status = 'termine';
+  p.dateFin = todayInput();
+  await putItem(STORES.projets, p);
+  await validateUsages(p.id);
+  renderProjects();
+  renderDashboard();
+  renderYarnReferenceSelect();
+  showView('project');
+  renderStock();
+});
+
+$('btn-project-reopen').addEventListener('click', async () => {
+  const p = currentProjectId ? projectOf(currentProjectId) : null;
+  if (!p) return;
+  p.status = 'en_cours';
+  p.dateFin = '';
+  await putItem(STORES.projets, p);
+  renderProjects();
+  renderDashboard();
+  renderProjectDetail();
+});
+
+$('btn-project-instructions').addEventListener('click', () => showView('instructions'));
+
+$('btn-instructions-back').addEventListener('click', () => showView('project'));
+
+$('btn-instructions-save').addEventListener('click', async () => {
+  const p = currentProjectId ? projectOf(currentProjectId) : null;
+  if (!p) return;
+  p.instructions = $('instructions-text').value;
+  p.instructionsDate = todayInput();
+  await putItem(STORES.projets, p);
+  renderProjects();
+  showView('project');
+});
+
+// ---------- Photo du projet ----------
+$('project-photo-input').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const p = currentProjectId ? projectOf(currentProjectId) : null;
+  if (!p) return;
+  if (!/^image\//.test(file.type || '')) {
+    $('photo-hint').textContent = 'Ce fichier n\'est pas une image.';
+    e.target.value = '';
+    return;
+  }
+  $('photo-hint').textContent = 'Traitement de l\'image…';
+  try {
+    p.photo = await shrinkImage(file, 1400, 0.82);
+    p.photoDate = todayInput();
+    await putItem(STORES.projets, p);
+    $('photo-hint').textContent =
+      'Photo enregistrée (' + Math.round(p.photo.length / 1400) + ' Ko environ).';
+    renderProjectClosing();
+  } catch (err) {
+    $('photo-hint').textContent = 'Impossible de lire cette image. Réessayez avec une autre photo.';
+  }
+  e.target.value = '';
+});
+
+$('btn-delete-photo').addEventListener('click', async () => {
+  const p = currentProjectId ? projectOf(currentProjectId) : null;
+  if (!p || !p.photo) return;
+  if (!confirm('Retirer la photo de ce projet ?')) return;
+  p.photo = '';
+  p.photoDate = '';
+  await putItem(STORES.projets, p);
+  $('photo-hint').textContent = 'Photo retirée.';
+  renderProjectClosing();
+});
 
 function renderSessions() {
   const p = currentProjectId ? projectOf(currentProjectId) : null;
